@@ -1,23 +1,27 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <title>マイ推しボタン</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
+<header>
     <h1>推しボイスボタン集</h1>
+</header>
 
-    <button class="voice-button" data-sound="voice1.mp3">
-        ボイス 1
-    </button>
-    <audio id="sound-voice1" src="sounds/voice1.mp3" preload="auto"></audio>
-
-    <button class="voice-button" data-sound="voice2.mp3">
-        ボイス 2
-    </button>
-    <audio id="sound-voice2" src="sounds/voice2.mp3" preload="auto"></audio>
+<section class="category">
+    <h2>挨拶 (Aisatsu)</h2>
     
-    <script src="script.js"></script>
-</body>
-</html>
+    <button class="voice-button" data-sound="01_greeting/baka1.wav">
+        おはよう
+    </button>
+    <audio id="sound-ohayo" src="sounds/aisatsu/baka1.wav" preload="auto"></audio>
+
+    <button class="voice-button" data-sound="01_greeting/baka2.wav">
+        こんにちは
+    </button>
+    <audio id="sound-konnichiwa" src="sounds/01_greeting/baka2.wav" preload="auto"></audio>
+</section>
+
+<section class="category">
+    <h2>肯定 (Koutei)</h2>
+
+    <button class="voice-button" data-sound="01_greeting/baka3.wav">
+        うんうん
+    </button>
+    <audio id="sound-unun" src="sounds/01_greeting/baka3.wav" preload="auto"></audio>
+    
+    </section>
