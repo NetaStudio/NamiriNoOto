@@ -1,0 +1,42 @@
+/* ---------------------------------------------------- */
+/* カスタムCSS：Tailwind CSSを補完するカスタムスタイル */
+/* ---------------------------------------------------- */
+
+/* 全体のボタンに適用するスタイル */
+.voice-button {
+    /* Tailwindのクラスと併用するため、最低限のスタイルを定義 */
+    width: 100%;
+    min-height: 100px; /* タッチしやすいサイズ */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, background-color 0.2s;
+    border: none;
+    cursor: pointer;
+    user-select: none;
+    
+    /* 初期デザイン（Tailwindと重複しない部分） */
+    border-radius: 1.5rem; /* rounded-3xl */
+    font-weight: 700; /* font-bold */
+    color: #ffffff;
+    background-image: linear-gradient(135deg, #f768b5 0%, #ff839a 100%);
+    box-shadow: 0 8px 15px rgba(247, 104, 181, 0.4), 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* ボタンがアクティブ（押されている）時のスタイル */
+.voice-button:active {
+    transform: translateY(2px) scale(0.98); /* 少し沈み込むアニメーション */
+    box-shadow: 0 4px 10px rgba(247, 104, 181, 0.5), 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* ホバー時のスタイル（PCでの操作性向上） */
+.voice-button:hover {
+    background-image: linear-gradient(135deg, #ff7abf 0%, #ff95a8 100%);
+}
+
+/* Gridの調整（モバイルでの見やすさ） */
+@media (max-width: 639px) {
+    .voice-grid {
+        grid-template-columns: 1fr 1fr; /* スマホでは2列にする */
+    }
+}
