@@ -52,7 +52,7 @@
                         否定
                     </button>
                     <button class="category-link" data-target="category-reaction">
-                        リアクション
+                        罵倒、煽り
                     </button>
                     <!-- 他のカテゴリを追加する場合はここにボタンを追加 -->
                 </nav>
@@ -70,11 +70,11 @@
                     <div class="voice-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                         
                         <!-- 🚨 data-soundには "sounds/" フォルダより下の階層を記述 -->
-                        <button class="voice-button" data-sound="01_greeting/ohayo.mp3">
+                        <button class="voice-button" data-sound="01_greeting/baka1.wav">
                             <span class="text-lg">おはよう</span>
                         </button>
 
-                        <button class="voice-button" data-sound="01_greeting/konnichiwa.mp3">
+                        <button class="voice-button" data-sound="02_positive/baka2.wav">
                             <span class="text-lg">こんにちは</span>
                         </button>
                         
@@ -88,11 +88,11 @@
                     </h2>
                     <div class="voice-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                         
-                        <button class="voice-button" data-sound="02_affirmation/iine.mp3">
+                        <button class="voice-button" data-sound="02_positive/baka2.wav">
                             <span class="text-lg">いいね！</span>
                         </button>
 
-                        <button class="voice-button" data-sound="02_affirmation/un_un.mp3">
+                        <button class="voice-button" data-sound="03_negative/baka3.wav">
                             <span class="text-lg">うんうん</span>
                         </button>
                         
@@ -106,8 +106,18 @@
                     </h2>
                     <div class="voice-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                         
-                        <button class="voice-button" data-sound="03_denial/nai.mp3">
+                        <!-- 既存のボタン -->
+                        <button class="voice-button" data-sound="01_greeting/baka1.wav">
                             <span class="text-lg">そうじゃない</span>
+                        </button>
+                        
+                        <!-- 新規追加のサンプル -->
+                        <button class="voice-button" data-sound="01_greeting/baka1.wav">
+                            <span class="text-lg">だめ！</span>
+                        </button>
+                        
+                        <button class="voice-button" data-sound="01_greeting/baka1.wav">
+                            <span class="text-lg">それは違う</span>
                         </button>
                         
                     </div>
