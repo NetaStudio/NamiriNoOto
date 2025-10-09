@@ -2,7 +2,7 @@
 /* カスタムCSS：Tailwind CSSを補完するカスタムスタイル */
 /* ---------------------------------------------------- */
 
-/* 全体のボタンに適用するスタイル */
+/* 全体のボタンに適用するスタイル (音声ボタン) */
 .voice-button {
     /* Tailwindのクラスと併用するため、最低限のスタイルを定義 */
     width: 100%;
@@ -39,4 +39,40 @@
     .voice-grid {
         grid-template-columns: 1fr 1fr; /* スマホでは2列にする */
     }
+}
+
+
+/* ---------------------------------------------------- */
+/* カテゴリリンク（サイドバーのボタン）のスタイル */
+/* ---------------------------------------------------- */
+
+.category-link {
+    width: 100%;
+    text-align: left;
+    padding: 10px 15px;
+    margin-bottom: 4px;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    color: #4b5563; /* text-gray-700 */
+    background-color: transparent;
+    transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+    border: none;
+    cursor: pointer;
+    
+    /* 🚨 修正ポイント: ブロック要素にして縦に並べる */
+    display: block; 
+}
+
+/* ホバー時 */
+.category-link:hover {
+    background-color: #fce7f3; /* pink-100 */
+    color: #db2777; /* pink-600 */
+}
+
+/* 選択されているカテゴリ */
+.category-link.selected {
+    background-color: #fbcfe8; /* pink-200 */
+    color: #be185d; /* pink-700 */
+    font-weight: 700;
+    box-shadow: inset 3px 0 0 0 #be185d; /* 左側に線の強調 */
 }
