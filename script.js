@@ -44,7 +44,7 @@
 
                 <button 
                     class="voice-button button-style" 
-                    data-sound="01_greeting/baka2.wav"
+                    data-sound="02_positive/baka2.wav"
                 >
                     <span class="text-lg">こんにちは</span>
                 </button>
@@ -52,7 +52,7 @@
                 <!-- 【重要】音声ファイルを増やしたら、data-soundのファイル名を変えてボタンを増やす -->
                 <button 
                     class="voice-button button-style" 
-                    data-sound="01_greeting/baka3.wav"
+                    data-sound="03_negative/baka3.wav"
                 >
                     <span class="text-lg">おやすみ</span>
                 </button>
@@ -61,7 +61,7 @@
         </section>
 
         <!-- 💡 他のカテゴリを追加する際は、ここに<section>をコピー＆ペーストして修正してください -->
-        <!-- 例: 肯定カテゴリ（ファイルパスは "sounds/01_greeting/baka3.wav" などになります） -->
+        <!-- 例: 肯定カテゴリ（ファイルパスは "sounds/03_negative/baka3.wav" などになります） -->
 
     </div>
 
@@ -69,3 +69,4 @@
     <script src="script.js"></script>
 </body>
 </html>
+
