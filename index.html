@@ -42,28 +42,25 @@
 </head>
 <body class="min-h-screen p-4 sm:p-8">
     <div id="app" class="max-w-7xl mx-auto bg-white shadow-xl rounded-3xl p-0">
-        
-        <!-- ヘッダーエリア: パディングを修正し、余分な中央寄せを防ぐ -->
+        <!-- ヘッダーエリア: 画像表示の左上揃えを復元 -->
         <header class="px-4 py-2 sm:px-6 sm:py-3 border-b border-gray-200">
-            
-            <!-- H1 (タイトル) は削除しました -->
-            
-            <!-- 画像コンテナ: justify-start (左寄せ) で画像を左に揃える -->
-            <div class="flex justify-start items-center space-x-4"> 
-                <!-- PNG画像 (左側) - h-autoに変更し、比率を保持 -->
+            <!-- 画像を横並び、左揃えで配置 -->
+            <div class="flex justify-start items-center space-x-4">
+                
+                <!-- PNG画像 (左側) -->
                 <img 
                     src="images/logo_01.png" 
                     alt="汐空なみり" 
-                    class="logo-png w-28 h-auto rounded-lg"
-                    onerror="this.onerror=null;this.src='https://placehold.co/112x96/e3e6f0/1f4c9b?text=PNG';"
+                    class="logo-png header-logo rounded-lg"
+                    onerror="this.onerror=null;this.src='https://placehold.co/96x96/e3e6f0/1f4c9b?text=PNG';"
                 >
-                
-                <!-- GIF画像 (右側) - h-autoに変更し、比率を保持 -->
+
+                <!-- GIF画像 (右側) -->
                 <img 
                     src="images/logo_02.gif" 
                     alt="Library" 
-                    class="logo-gif w-20 h-auto rounded-lg"
-                    onerror="this.onerror=null;this.src='https://placehold.co/80x80/e3e6f0/1f4c9b?text=GIF';"
+                    class="logo-gif header-logo rounded-lg"
+                    onerror="this.onerror=null;this.src='https://placehold.co/96x96/e3e6f0/1f4c9b?text=GIF';"
                 >
             </div>
         </header>
@@ -76,20 +73,20 @@
                 <div id="sidebar-inner">
                     <h3 class="font-bold text-gray-700 mb-2 border-b pb-1">カテゴリ一覧</h3>
                     <nav id="category-nav">
-                        <!-- JSがここにカテゴリボタンとお気に入りフォルダを生成 -->
+                        <!-- JSがここにカテゴリボタンとお気に入りリンクを自動で挿入します -->
                     </nav>
                 </div>
             </aside>
 
-            <!-- 右側: ボイスボタン表示エリア -->
-            <main id="main-content" class="w-3/4">
-                <!-- JSがここにボイスボタンを生成 -->
+            <!-- 右側: 音声ボタン表示エリア -->
+            <main id="main-content" class="w-3/4 p-6">
+                <!-- JSがここにカテゴリセクションを自動で挿入します -->
             </main>
         </div>
+
     </div>
 
-    <!-- JavaScriptファイル -->
-    <!-- ★修正点: type="module" を追加してimport文を有効化★ -->
-    <script src="script.js" type="module"></script> 
+    <!-- JavaScriptファイルを読み込みます -->
+    <script src="script.js"></script>
 </body>
 </html>
