@@ -1,5 +1,6 @@
 // =================================================================
 // 1. データ定義: 全てのカテゴリとボイスデータをJSON形式で管理します。
+// 音声ファイルを追加・修正する場合は、この配列を編集してください。
 // =================================================================
 
 const VOICE_DATA = [
@@ -9,8 +10,8 @@ const VOICE_DATA = [
         folder: "01_greeting",
         en_name: "Greeting",
         voices: [
-            { text: "おはよう", file: "baka1.wav", voice_id: "v1-01" },
-            { text: "こんにちは", file: "baka2.wav", voice_id: "v1-02" }
+            { text: "おはよう", file: "baka1.wav" },
+            { text: "こんにちは", file: "baka2.wav" }
         ]
     },
     {
@@ -19,382 +20,541 @@ const VOICE_DATA = [
         folder: "02_positive",
         en_name: "Affirmation",
         voices: [
-            { text: "いいね！", file: "baka2.wav", voice_id: "v2-01" },
-            { text: "うんうん", file: "baka3.wav", voice_id: "v2-02" },
-            { text: "それはすごい", file: "baka1.wav", voice_id: "v2-03" }, 
+            { text: "いいね！", file: "baka2.wav" },
+            { text: "うんうん", file: "baka3.wav" },
+            { text: "それはすごい", file: "baka1.wav" }, // 新しいボイスを追加
         ]
     },
     {
         id: "category-denial",
         name: "否定",
-        folder: "03_denial", 
+        folder: "03_denial", // sounds/03_denial/
         en_name: "Denial",
         voices: [
-            { text: "そうじゃない", file: "baka1.wav", voice_id: "v3-01" },
-            { text: "だめ！", file: "baka1.wav", voice_id: "v3-02" },
-            { text: "それは違う", file: "baka1.wav", voice_id: "v3-03" }
+            { text: "そうじゃない", file: "baka1.wav" },
+            { text: "だめ！", file: "baka1.wav" },
+            { text: "それは違う", file: "baka1.wav" }
+        ]
+    },
+    {
+        id: "category-question",
+        name: "疑問",
+        folder: "04_question",
+        en_name: "Question",
+        voices: [
+            { text: "え、そうなの？", file: "baka1.wav" },
+            { text: "なぜ？", file: "baka2.wav" }
+        ]
+    },
+    {
+        id: "category-cheer",
+        name: "応援",
+        folder: "05_cheer",
+        en_name: "Cheer",
+        voices: [
+            { text: "頑張れ！", file: "baka1.wav" },
+            { text: "ファイト！", file: "baka2.wav" },
+            { text: "やればできる！", file: "baka1.wav" }
         ]
     }
 ];
 
+
 // =================================================================
-// 2. Firebase/Firestore 初期化と状態管理
+// 2. グローバル変数と初期設定
 // =================================================================
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// ユーザーが現在選択しているカテゴリを追跡するID
+let currentCategoryId = VOICE_DATA[0].id;
 
-// グローバル変数
-let db;
-let auth;
-let userId = null;
+// ローカルストレージキー
+const STORAGE_KEY = 'voiceCollectionFavorites';
+
+// カテゴリ全体 (標準データ + お気に入りデータ) を保持
+let allCategories = [...VOICE_DATA];
+
+// オーディオ要素を保持するためのグローバル変数
 let currentAudio = null;
-let currentCategory = VOICE_DATA[0].id; // デフォルトで最初のカテゴリを表示
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-// お気に入り状態を保持するSet（高速な検索のため）
-let userFavorites = new Set();
-let isAuthReady = false; // 認証準備完了フラグ
 
-/**
- * ユーザー固有のFirestoreドキュメントパスを取得
- * @returns {string} Firestoreドキュメントの参照パス
- */
-function getFavoritesDocRef() {
-    if (!userId) {
-        // userIdがない場合はエラーまたは一時的な処理を検討
-        console.error("User ID is not set. Cannot get Firestore path.");
-        return null;
-    }
-    // パス: /artifacts/{appId}/users/{userId}/favorites/data/favoritesDoc
-    const docPath = `artifacts/${appId}/users/${userId}/favorites/data/favoritesDoc`;
-    return doc(db, docPath);
-}
+// =================================================================
+// 3. データ操作: ローカルストレージ
+// =================================================================
 
 /**
- * お気に入りデータをFirestoreから購読し、リアルタイムで更新
+ * ローカルストレージからお気に入りデータを読み込む
  */
-function loadUserFavorites() {
-    if (!db || !userId) {
-        console.warn("Firestore or User ID is not ready for loading favorites.");
-        return;
-    }
-
-    const favoritesDocRef = getFavoritesDocRef();
-    if (!favoritesDocRef) return;
-
-    // onSnapshotでリアルタイム購読
-    onSnapshot(favoritesDocRef, (docSnap) => {
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            // 配列として保存されたお気に入りIDをSetに変換
-            userFavorites = new Set(data.voiceIds || []);
-            console.log("Favorites loaded:", userFavorites.size, "items.");
-        } else {
-            // ドキュメントが存在しない場合、空のSetとして初期化
-            userFavorites = new Set();
-            console.log("No existing favorites found. Initializing empty set.");
-        }
-        // お気に入り状態が変更されたら、現在のビューを再描画
-        // (これにより、星のアイコンの状態が更新される)
-        displayCategory(currentCategory);
-    }, (error) => {
-        console.error("Error subscribing to favorites:", error);
-    });
-}
-
-/**
- * お気に入り状態をFirestoreに保存
- */
-async function saveFavoritesToFirestore() {
-    if (!db || !userId) {
-        console.error("Firestore or User ID is not ready for saving favorites.");
-        return;
-    }
-
-    const favoritesDocRef = getFavoritesDocRef();
-    if (!favoritesDocRef) return;
-
+function loadFavoritesFromStorage() {
     try {
-        // Setを配列に変換して保存
-        await setDoc(favoritesDocRef, { voiceIds: Array.from(userFavorites) });
-        console.log("Favorites saved successfully.");
-    } catch (e) {
-        console.error("Error saving favorites to Firestore: ", e);
-    }
-}
-
-/**
- * Firebaseの初期化と認証処理
- */
-async function initializeFirebaseAndAuth() {
-    try {
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-
-        // 認証状態の変更を監視
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                userId = user.uid;
-            } else {
-                // 匿名サインインを試みる
-                const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                if (token) {
-                    await signInWithCustomToken(auth, token);
-                    userId = auth.currentUser.uid;
-                } else {
-                    await signInAnonymously(auth);
-                    userId = auth.currentUser.uid;
-                }
-            }
-            isAuthReady = true;
-            console.log("Firebase Auth Ready. User ID:", userId);
+        const storedData = localStorage.getItem(STORAGE_KEY);
+        if (storedData) {
+            const parsedData = JSON.parse(storedData);
             
-            // 認証が完了したら、データの読み込みを開始
-            loadUserFavorites();
-            renderSidebar();
-            displayCategory(currentCategory);
+            // 既存のお気に入りカテゴリをクリア
+            allCategories = allCategories.filter(cat => !cat.isFavorite);
 
-        });
-    } catch (error) {
-        console.error("Error initializing Firebase:", error);
+            // 読み込んだデータをallCategoriesにマージ
+            const loadedFavorites = parsedData.filter(fav => fav.isFavorite);
+            allCategories.push(...loadedFavorites);
+        }
+    } catch (e) {
+        console.error("Error loading favorites from localStorage:", e);
+    }
+}
+
+/**
+ * お気に入りデータをローカルストレージに保存する
+ */
+function saveFavoritesToStorage() {
+    try {
+        // お気に入りフォルダのみをフィルタリングして保存
+        const favoritesToSave = allCategories.filter(cat => cat.isFavorite);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(favoritesToSave));
+    } catch (e) {
+        console.error("Error saving favorites to localStorage:", e);
     }
 }
 
 
 // =================================================================
-// 3. UI/イベント処理
+// 4. UI構築: カテゴリサイドバー
 // =================================================================
 
 /**
- * お気に入りボタンのトグル処理
- * @param {Event} event - クリックイベント
+ * サイドバーのカテゴリリストを構築する
  */
-function toggleFavorite(event) {
-    event.stopPropagation(); // ボイスボタンの再生イベントを阻止
+function renderSidebar() {
+    const categoryNav = document.getElementById('category-nav');
+    if (!categoryNav) return;
 
-    const favoriteButton = event.currentTarget;
-    const voiceId = favoriteButton.getAttribute('data-voice-id');
+    // 一旦クリア
+    categoryNav.innerHTML = '';
 
-    if (!isAuthReady) {
-        console.warn("Authentication not ready. Cannot save favorite.");
-        // UI上でフィードバックを与えるべき
-        alert("お気に入り機能を使うには、認証が完了するまでお待ちください。"); 
-        return;
-    }
+    // 1. 標準カテゴリのレンダリング
+    const standardCategories = allCategories.filter(cat => !cat.isFavorite);
+    standardCategories.forEach(category => {
+        categoryNav.appendChild(createCategoryLink(category));
+    });
 
-    if (userFavorites.has(voiceId)) {
-        // 削除
-        userFavorites.delete(voiceId);
-        favoriteButton.classList.remove('is-favorite');
-        favoriteButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 fill-current text-gray-400" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.433-.678 1.48-.678 1.913 0l2.365 3.706a1 1 0 00.842.597h4.085c.783 0 1.096.96.488 1.432l-3.35 2.502a1 1 0 00-.365 1.112l1.286 3.965c.21.65-.547 1.18-.946.726l-3.23-2.316a1 1 0 00-1.077 0l-3.23 2.316c-.399.454-1.156-.076-.946-.726l1.286-3.965a1 1 0 00-.365-1.112l-3.35-2.502c-.608-.472-.295-1.432.488-1.432h4.085a1 1 0 00.842-.597l2.365-3.706z" /></svg>`;
-    } else {
-        // 追加
-        userFavorites.add(voiceId);
-        favoriteButton.classList.add('is-favorite');
-        favoriteButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 fill-current text-yellow-400" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="yellow"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.433-.678 1.48-.678 1.913 0l2.365 3.706a1 1 0 00.842.597h4.085c.783 0 1.096.96.488 1.432l-3.35 2.502a1 1 0 00-.365 1.112l1.286 3.965c.21.65-.547 1.18-.946.726l-3.23-2.316a1 1 0 00-1.077 0l-3.23 2.316c-.399.454-1.156-.076-.946-.726l1.286-3.965a1 1 0 00-.365-1.112l-3.35-2.502c-.608-.472-.295-1.432.488-1.432h4.085a1 1 0 00.842-.597l2.365-3.706z" /></svg>`;
-    }
+    // 2. お気に入りセクションのレンダリング
+    const favoritesHeader = document.createElement('h4');
+    favoritesHeader.className = 'font-bold text-gray-700 mt-4 mb-2 border-b pb-1 flex justify-between items-center';
+    favoritesHeader.innerHTML = '★ お気に入り';
 
-    // Firestoreに保存
-    saveFavoritesToFirestore();
+    const addButton = document.createElement('button');
+    addButton.textContent = '+';
+    addButton.className = 'text-xl font-bold text-blue-600 hover:text-blue-800 transition-colors p-1 leading-none';
+    addButton.title = '新しいお気に入りフォルダを作成';
+    addButton.addEventListener('click', createNewFavoriteCategory);
+
+    favoritesHeader.appendChild(addButton);
+    categoryNav.appendChild(favoritesHeader);
+    
+    // 3. お気に入りフォルダのレンダリング
+    const favoriteCategories = allCategories.filter(cat => cat.isFavorite);
+    favoriteCategories.forEach(category => {
+        categoryNav.appendChild(createCategoryLink(category));
+    });
+
+    // 選択状態を復元
+    updateSelectedCategoryLink();
+    renderVoiceButtons();
 }
 
 /**
- * ボイスボタンを生成
- * @param {Object} voice - ボイスデータオブジェクト
- * @param {string} folder - カテゴリフォルダ名
- * @returns {HTMLElement} ボタン要素
+ * カテゴリリンク要素を作成する
+ * @param {object} category - カテゴリデータオブジェクト
+ * @returns {HTMLButtonElement} カテゴリボタン要素
  */
-function createVoiceButton(voice, folder) {
+function createCategoryLink(category) {
     const button = document.createElement('button');
-    // data-sound: sounds/フォルダ名/ファイル名 の形式
-    const soundPath = `${folder}/${voice.file}`;
-    const fullVoiceId = voice.voice_id;
+    button.id = `cat-${category.id}`;
+    button.className = 'category-link'; // style.cssで定義
+    button.textContent = category.name;
+    button.setAttribute('data-category-id', category.id);
 
-    button.className = 'voice-button flex items-center justify-between px-6 py-4 transition-all duration-150 ease-in-out';
-    button.setAttribute('data-sound', soundPath);
-    button.setAttribute('data-voice-id', fullVoiceId);
+    if (category.isFavorite) {
+        // お気に入りフォルダの場合、特別なクラスを適用
+        button.classList.add('favorite-link');
 
-    // テキスト要素
-    const textSpan = document.createElement('span');
-    textSpan.textContent = voice.text;
-    textSpan.className = 'text-lg font-semibold text-white truncate mr-4';
-    
-    // お気に入りボタンコンテナ
-    const favoriteWrapper = document.createElement('div');
-    favoriteWrapper.className = 'favorite-wrapper p-1 rounded-full bg-white bg-opacity-10 hover:bg-opacity-20 transition duration-150';
-    favoriteWrapper.onclick = toggleFavorite;
-    favoriteWrapper.setAttribute('data-voice-id', fullVoiceId); // ラッパーにもIDを設定
+        // フォルダの編集・削除ボタンを追加するコンテナ
+        const controls = document.createElement('span');
+        controls.className = 'float-right space-x-2 hidden'; // 初期状態では非表示
+        
+        // 削除ボタン
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'x';
+        deleteBtn.className = 'text-red-500 hover:text-red-700 text-sm leading-none';
+        deleteBtn.title = 'お気に入りフォルダを削除';
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // カテゴリ切り替えを防ぐ
+            deleteCategory(category.id);
+        });
 
-    // お気に入りアイコン
-    const isFavorited = userFavorites.has(fullVoiceId);
-    
-    // SVGアイコン
-    const starIcon = isFavorited
-        ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 fill-current text-yellow-400" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="yellow"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.433-.678 1.48-.678 1.913 0l2.365 3.706a1 1 0 00.842.597h4.085c.783 0 1.096.96.488 1.432l-3.35 2.502a1 1 0 00-.365 1.112l1.286 3.965c.21.65-.547 1.18-.946.726l-3.23-2.316a1 1 0 00-1.077 0l-3.23 2.316c-.399.454-1.156-.076-.946-.726l1.286-3.965a1 1 0 00-.365-1.112l-3.35-2.502c-.608-.472-.295-1.432.488-1.432h4.085a1 1 0 00.842-.597l2.365-3.706z" /></svg>`
-        : `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 fill-current text-gray-400" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.433-.678 1.48-.678 1.913 0l2.365 3.706a1 1 0 00.842.597h4.085c.783 0 1.096.96.488 1.432l-3.35 2.502a1 1 0 00-.365 1.112l1.286 3.965c.21.65-.547 1.18-.946.726l-3.23-2.316a1 1 0 00-1.077 0l-3.23 2.316c-.399.454-1.156-.076-.946-.726l1.286-3.965a1 1 0 00-.365-1.112l-3.35-2.502c-.608-.472-.295-1.432.488-1.432h4.085a1 1 0 00.842-.597l2.365-3.706z" /></svg>`;
-    
-    favoriteWrapper.innerHTML = starIcon;
-    favoriteWrapper.classList.toggle('is-favorite', isFavorited); // クラスもトグル
+        // 編集ボタン
+        const editBtn = document.createElement('button');
+        editBtn.textContent = '...';
+        editBtn.className = 'text-gray-500 hover:text-gray-700 text-sm leading-none';
+        editBtn.title = 'フォルダ名を編集';
+        editBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // カテゴリ切り替えを防ぐ
+            renameCategory(category.id);
+        });
 
-    button.appendChild(textSpan);
-    button.appendChild(favoriteWrapper);
-    button.addEventListener('click', handleVoiceButtonClick); // ボイスボタン自体のクリックイベント
+        controls.appendChild(editBtn);
+        controls.appendChild(deleteBtn);
+        button.appendChild(controls);
+
+        // ホバー時にコントロールを表示
+        button.addEventListener('mouseenter', () => controls.classList.remove('hidden'));
+        button.addEventListener('mouseleave', () => controls.classList.add('hidden'));
+
+    }
     
+    // イベントリスナーを設定
+    button.addEventListener('click', () => {
+        currentCategoryId = category.id;
+        renderVoiceButtons();
+        updateSelectedCategoryLink();
+    });
+
     return button;
 }
 
 /**
- * 指定されたカテゴリのボイスボタンをメインコンテンツエリアに表示
- * @param {string} categoryId - 表示するカテゴリのID (例: 'category-greeting')
+ * サイドバーの選択状態を更新する
  */
-function displayCategory(categoryId) {
-    currentCategory = categoryId;
-    const mainContent = document.getElementById('main-content');
-    mainContent.innerHTML = ''; // コンテンツをクリア
-
-    const categoryData = VOICE_DATA.find(cat => cat.id === categoryId);
-
-    if (categoryData) {
-        // カテゴリ名とユーザーIDを表示
-        const header = document.createElement('div');
-        header.className = 'p-6 pb-2 border-b mb-4';
-        header.innerHTML = `
-            <h2 class="text-3xl font-bold text-gray-800 mb-1">${categoryData.name}</h2>
-            <p class="text-xs text-gray-500 truncate">Category ID: ${categoryId} | User ID: ${userId || 'Loading...'}</p>
-        `;
-        mainContent.appendChild(header);
-
-        // ボイスボタンをGridレイアウトで配置するコンテナ
-        const gridContainer = document.createElement('div');
-        gridContainer.className = 'voice-grid grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
-
-        categoryData.voices.forEach(voice => {
-            const button = createVoiceButton(voice, categoryData.folder);
-            gridContainer.appendChild(button);
-        });
-
-        mainContent.appendChild(gridContainer);
-    } else {
-        // お気に入りなど、特別なビューの処理を呼び出す
-        if (categoryId === 'category-favorites') {
-            displayFavorites();
+function updateSelectedCategoryLink() {
+    document.querySelectorAll('.category-link').forEach(link => {
+        if (link.getAttribute('data-category-id') === currentCategoryId) {
+            link.classList.add('selected');
         } else {
-            mainContent.innerHTML = `<p class="p-4 text-center text-gray-500">カテゴリが見つかりません。</p>`;
+            link.classList.remove('selected');
         }
-    }
-
-    // サイドバーの選択状態を更新
-    document.querySelectorAll('.category-button').forEach(btn => {
-        btn.classList.remove('is-active');
-        if (btn.getAttribute('data-category-id') === categoryId) {
-            btn.classList.add('is-active');
-        }
-    });
-}
-
-/**
- * お気に入り登録されたボイスのみを表示
- */
-function displayFavorites() {
-    currentCategory = 'category-favorites';
-    const mainContent = document.getElementById('main-content');
-    mainContent.innerHTML = '';
-
-    const header = document.createElement('div');
-    header.className = 'p-6 pb-2 border-b mb-4';
-    header.innerHTML = `
-        <h2 class="text-3xl font-bold text-pink-600 mb-1">💖 お気に入り 💖</h2>
-        <p class="text-xs text-gray-500 truncate">User ID: ${userId || 'Loading...'}</p>
-    `;
-    mainContent.appendChild(header);
-
-    const favoriteVoices = [];
-    VOICE_DATA.forEach(category => {
-        category.voices.forEach(voice => {
-            if (userFavorites.has(voice.voice_id)) {
-                favoriteVoices.push({ voice, folder: category.folder });
-            }
-        });
-    });
-
-    if (favoriteVoices.length === 0) {
-        mainContent.innerHTML += `<p class="p-6 text-center text-gray-500">お気に入りに登録されているボイスはありません。</p>`;
-        return;
-    }
-
-    const gridContainer = document.createElement('div');
-    gridContainer.className = 'voice-grid grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
-
-    favoriteVoices.forEach(item => {
-        const button = createVoiceButton(item.voice, item.folder);
-        gridContainer.appendChild(button);
-    });
-
-    mainContent.appendChild(gridContainer);
-    
-    // サイドバーの選択状態を更新
-    document.querySelectorAll('.category-button').forEach(btn => {
-        btn.classList.remove('is-active');
-        if (btn.getAttribute('data-category-id') === 'category-favorites') {
-            btn.classList.add('is-active');
-        }
-    });
-}
-
-/**
- * サイドバーのカテゴリボタンと「お気に入り」リンクを生成
- */
-function renderSidebar() {
-    const categoryNav = document.getElementById('category-nav');
-    categoryNav.innerHTML = '';
-    
-    // -------------------
-    // 1. お気に入りリンク
-    // -------------------
-    const favoriteLink = document.createElement('button');
-    favoriteLink.textContent = '💖 お気に入り';
-    favoriteLink.className = 'category-button w-full text-left py-2 px-3 my-1 rounded-lg transition duration-150 ease-in-out';
-    favoriteLink.setAttribute('data-category-id', 'category-favorites');
-    favoriteLink.addEventListener('click', () => displayCategory('category-favorites'));
-    categoryNav.appendChild(favoriteLink);
-
-    // 区切り線
-    const divider = document.createElement('hr');
-    divider.className = 'my-3 border-gray-300';
-    categoryNav.appendChild(divider);
-
-
-    // -------------------
-    // 2. 通常カテゴリボタン
-    // -------------------
-    VOICE_DATA.forEach(category => {
-        const button = document.createElement('button');
-        button.textContent = category.name;
-        button.className = 'category-button w-full text-left py-2 px-3 my-1 rounded-lg transition duration-150 ease-in-out';
-        button.setAttribute('data-category-id', category.id);
-        button.addEventListener('click', () => displayCategory(category.id));
-        categoryNav.appendChild(button);
     });
 }
 
 
 // =================================================================
-// 4. オーディオ再生処理
+// 5. UI構築: ボイスボタン
+// =================================================================
+
+/**
+ * 選択中のカテゴリに基づいてボイスボタンをレンダリングする
+ */
+function renderVoiceButtons() {
+    const mainContent = document.getElementById('main-content');
+    if (!mainContent) return;
+
+    // 現在選択されているカテゴリを取得
+    const category = allCategories.find(cat => cat.id === currentCategoryId);
+
+    mainContent.innerHTML = ''; // コンテンツをクリア
+
+    if (!category) {
+        mainContent.innerHTML = '<p class="text-gray-500 p-8">カテゴリが見つかりません。</p>';
+        return;
+    }
+    
+    // カテゴリ名を表示
+    const title = document.createElement('h2');
+    title.className = 'text-2xl font-bold text-gray-800 p-6 pb-4 border-b border-gray-200';
+    title.textContent = category.name;
+    mainContent.appendChild(title);
+    
+    // ボイスボタンコンテナ
+    const gridContainer = document.createElement('div');
+    gridContainer.className = 'voice-grid grid grid-cols-3 gap-4 p-6'; // voice-gridはCSSでレスポンシブ調整
+
+    category.voices.forEach(voice => {
+        gridContainer.appendChild(createVoiceButton(voice, category.folder, category.isFavorite));
+    });
+
+    mainContent.appendChild(gridContainer);
+}
+
+/**
+ * 単一のボイスボタン要素を作成する
+ * @param {object} voice - ボイスデータ {text, file}
+ * @param {string} folder - 親カテゴリのフォルダ名
+ * @param {boolean} isFavoriteCategory - お気に入りフォルダ内のボタンか
+ * @returns {HTMLButtonElement} ボイスボタン要素
+ */
+function createVoiceButton(voice, folder, isFavoriteCategory) {
+    const button = document.createElement('button');
+    button.className = 'voice-button relative'; // style.cssで定義
+    button.setAttribute('data-sound', `${folder}/${voice.file}`);
+    button.addEventListener('click', handleVoiceButtonClick);
+
+    // 1. テキスト
+    const span = document.createElement('span');
+    span.className = 'text-base truncate mr-1'; // 文字サイズをtext-base (16px) に設定
+    span.textContent = voice.text;
+    button.appendChild(span);
+
+    // 2. お気に入りボタン (標準カテゴリでのみ表示)
+    if (!isFavoriteCategory) {
+        const favoriteButton = document.createElement('button');
+        favoriteButton.className = 'absolute top-2 right-2 p-1 text-xl leading-none';
+        
+        // アイコン
+        const icon = document.createElement('span');
+        icon.className = 'favorite-icon'; // style.cssで定義
+        icon.textContent = getFavoriteStatus(voice, folder) ? '★' : '☆'; // お気に入り状態に応じてアイコンを切り替え
+
+        if (getFavoriteStatus(voice, folder)) {
+            icon.classList.add('text-yellow-400'); // お気に入り登録済み
+        }
+
+        favoriteButton.appendChild(icon);
+        
+        favoriteButton.addEventListener('click', (e) => {
+            e.stopPropagation(); // 音声再生を防ぐ
+            toggleFavorite(voice, folder, icon);
+        });
+
+        button.appendChild(favoriteButton);
+    }
+    
+    // 3. 削除ボタン (お気に入りフォルダでのみ表示)
+    if (isFavoriteCategory) {
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = 'x';
+        deleteButton.className = 'absolute top-0 right-1 text-red-500 hover:text-red-700 text-lg p-1 leading-none opacity-0 transition-opacity';
+        deleteButton.title = 'このボイスをお気に入りから削除';
+        
+        // ホバーで削除ボタンを表示
+        button.addEventListener('mouseenter', () => deleteButton.classList.remove('opacity-0'));
+        button.addEventListener('mouseleave', () => deleteButton.classList.add('opacity-0'));
+
+        deleteButton.addEventListener('click', (e) => {
+            e.stopPropagation(); // 音声再生を防ぐ
+            removeVoiceFromFavorite(currentCategoryId, voice, folder);
+        });
+        
+        button.appendChild(deleteButton);
+    }
+
+    return button;
+}
+
+// =================================================================
+// 6. お気に入り (Favorite) 機能
+// =================================================================
+
+/**
+ * 指定されたボイスが既にお気に入りに登録されているかチェック
+ * @param {object} voice - ボイスデータ
+ * @param {string} folder - 元のカテゴリフォルダ名
+ * @returns {boolean} - 登録されているかどうか
+ */
+function getFavoriteStatus(voice, folder) {
+    // 全てのお気に入りカテゴリを走査
+    const favorites = allCategories.filter(cat => cat.isFavorite);
+    const targetPath = `${folder}/${voice.file}`;
+
+    return favorites.some(favCat => 
+        favCat.voices.some(favVoice => 
+            `${favVoice.folder}/${favVoice.file}` === targetPath
+        )
+    );
+}
+
+/**
+ * ボイスのお気に入り登録/解除を切り替える
+ * @param {object} voice - ボイスデータ
+ * @param {string} folder - 元のカテゴリフォルダ名
+ * @param {HTMLElement} iconElement - アイコン要素
+ */
+function toggleFavorite(voice, folder, iconElement) {
+    const isFavorited = getFavoriteStatus(voice, folder);
+
+    if (isFavorited) {
+        // 登録済みの場合: 全てのお気に入りフォルダから削除
+        const favorites = allCategories.filter(cat => cat.isFavorite);
+        const targetPath = `${folder}/${voice.file}`;
+
+        favorites.forEach(favCat => {
+            favCat.voices = favCat.voices.filter(favVoice => 
+                `${favVoice.folder}/${favVoice.file}` !== targetPath
+            );
+        });
+        
+        iconElement.textContent = '☆';
+        iconElement.classList.remove('text-yellow-400');
+        console.log(`[Favorite] Removed: ${voice.text}`);
+    } else {
+        // 未登録の場合: 最初の（またはデフォルトの）お気に入りフォルダに追加
+        let defaultFavorite = allCategories.find(cat => cat.isFavorite);
+
+        if (!defaultFavorite) {
+            // お気に入りフォルダが存在しない場合は自動で作成
+            const newId = `favorite-${Date.now()}`;
+            defaultFavorite = {
+                id: newId,
+                name: "マイ・お気に入り",
+                folder: "favorites", // お気に入りボイスは元のフォルダ情報を保持
+                isFavorite: true,
+                voices: []
+            };
+            allCategories.push(defaultFavorite);
+            console.log("[Favorite] Auto-created default favorite folder.");
+            renderSidebar(); // サイドバーを更新して新しいフォルダを表示
+        }
+        
+        // ボイスを保存する際は、元のフォルダ情報も保持
+        defaultFavorite.voices.push({
+            text: voice.text,
+            file: voice.file,
+            folder: folder // 元のカテゴリフォルダ名を記録
+        });
+
+        iconElement.textContent = '★';
+        iconElement.classList.add('text-yellow-400');
+        console.log(`[Favorite] Added to ${defaultFavorite.name}: ${voice.text}`);
+    }
+
+    saveFavoritesToStorage(); // 変更を保存
+    renderSidebar(); // サイドバーを更新
+    renderVoiceButtons(); // ボタン表示を更新（アイコン変更のため）
+}
+
+/**
+ * 新しいお気に入りフォルダを作成する
+ */
+function createNewFavoriteCategory() {
+    // 新しいお気に入りの名前をユーザーに尋ねる
+    const rawName = prompt("新しいお気に入りフォルダの名前を入力してください (日本語・英語可):");
+    
+    // null (キャンセル) または、前後の空白を除去した結果が空文字列の場合は処理を終了
+    const newFavoriteName = rawName ? rawName.trim() : null;
+
+    if (!newFavoriteName) {
+        console.log("[Favorite] Folder creation cancelled or name was empty.");
+        return;
+    }
+
+    // フォルダ名が既に存在するかチェック
+    const exists = allCategories.some(cat => cat.isFavorite && cat.name === newFavoriteName);
+    if (exists) {
+        alert("その名前のお気に入りフォルダは既に存在します。");
+        return;
+    }
+
+    // 新しいフォルダを追加
+    addCategory({
+        id: `favorite-${Date.now()}`,
+        name: newFavoriteName, // trim()後の文字列を使用
+        folder: "favorites", 
+        isFavorite: true,
+        voices: []
+    });
+}
+
+
+/**
+ * カテゴリをallCategoriesに追加し、UIとストレージを更新する
+ * @param {object} newCategory - 新しいカテゴリデータ
+ */
+function addCategory(newCategory) {
+    allCategories.push(newCategory);
+    saveFavoritesToStorage();
+    renderSidebar();
+}
+
+/**
+ * お気に入りフォルダの名前を変更する
+ * @param {string} categoryId - 変更するカテゴリのID
+ */
+function renameCategory(categoryId) {
+    const category = allCategories.find(cat => cat.id === categoryId);
+    if (!category || !category.isFavorite) return;
+
+    const newName = prompt(`「${category.name}」の新しい名前を入力してください:`);
+    const trimmedNewName = newName ? newName.trim() : null;
+
+    if (!trimmedNewName || trimmedNewName === category.name) {
+        return; // キャンセル、空、または変更なし
+    }
+    
+    // フォルダ名が既に存在するかチェック
+    const exists = allCategories.some(cat => cat.isFavorite && cat.name === trimmedNewName);
+    if (exists) {
+        alert("その名前のお気に入りフォルダは既に存在します。");
+        return;
+    }
+
+    category.name = trimmedNewName;
+    saveFavoritesToStorage();
+    renderSidebar();
+    renderVoiceButtons(); // タイトル表示を更新
+}
+
+/**
+ * お気に入りフォルダを削除する
+ * @param {string} categoryId - 削除するカテゴリのID
+ */
+function deleteCategory(categoryId) {
+    const categoryIndex = allCategories.findIndex(cat => cat.id === categoryId && cat.isFavorite);
+    if (categoryIndex === -1) return;
+
+    // 削除確認 (注意: alert/confirmは使用しないルールのため、ここでは単純に処理します。本来はカスタムモーダルを使用すべきです)
+    if (!confirm(`お気に入りフォルダ「${allCategories[categoryIndex].name}」を削除してもよろしいですか？`)) {
+        return;
+    }
+
+    allCategories.splice(categoryIndex, 1);
+    
+    // 削除したカテゴリが現在選択中のカテゴリだった場合、デフォルトに戻す
+    if (currentCategoryId === categoryId) {
+        currentCategoryId = allCategories.find(cat => !cat.isFavorite)?.id || (allCategories[0] ? allCategories[0].id : null);
+    }
+    
+    saveFavoritesToStorage();
+    renderSidebar();
+}
+
+/**
+ * お気に入りフォルダから特定のボイスを削除する
+ * @param {string} favoriteId - ターゲットのお気に入りフォルダID
+ * @param {object} voice - 削除するボイスデータ
+ * @param {string} folder - 元のカテゴリフォルダ名
+ */
+function removeVoiceFromFavorite(favoriteId, voice, folder) {
+    const favoriteCategory = allCategories.find(cat => cat.id === favoriteId);
+    if (!favoriteCategory) return;
+
+    const targetPath = `${folder}/${voice.file}`;
+
+    // 該当ボイスをフィルタリングして削除
+    favoriteCategory.voices = favoriteCategory.voices.filter(favVoice => 
+        `${favVoice.folder}/${favVoice.file}` !== targetPath
+    );
+    
+    saveFavoritesToStorage();
+    renderVoiceButtons(); // 表示を更新
+    
+    // 標準カテゴリのアイコンも更新するために全再描画
+    const standardCategories = allCategories.filter(cat => !cat.isFavorite);
+    standardCategories.forEach(cat => {
+        // 標準カテゴリが選択されていたらボタンを再描画
+        if (cat.id === currentCategoryId) {
+            renderVoiceButtons();
+        }
+    });
+
+    console.log(`[Favorite] Removed voice from folder ${favoriteCategory.name}: ${voice.text}`);
+}
+
+
+// =================================================================
+// 7. 音声再生処理
 // =================================================================
 
 /**
  * ボタンクリック時のハンドラ
  */
 function handleVoiceButtonClick() {
-    // お気に入りボタン（ラッパー）でのクリックを無視
-    if (event.target.closest('.favorite-wrapper')) {
-        return;
-    }
-
     const soundPath = this.getAttribute('data-sound');
     if (!soundPath) {
         console.error('Error: data-sound attribute is missing on this button.', this);
@@ -402,6 +562,8 @@ function handleVoiceButtonClick() {
     }
 
     // フルパスを構築 (例: "sounds/01_greeting/baka1.wav")
+    // お気に入りから再生する場合、voiceオブジェクトにfolderプロパティを追加しているため、
+    // data-sound属性には常に正しいパスが入っています。
     const fullPath = 'sounds/' + soundPath;
     
     playAudioWithRetry(fullPath);
@@ -417,9 +579,8 @@ async function playAudioWithRetry(url, retries = 3) {
     if (currentAudio) {
         currentAudio.pause();
         currentAudio.currentTime = 0;
-        currentAudio = null;
     }
-
+    
     try {
         const audio = new Audio(url);
         currentAudio = audio; // 現在のAudioオブジェクトを保存
@@ -452,7 +613,16 @@ async function playAudioWithRetry(url, retries = 3) {
 
 
 // =================================================================
-// 5. アプリケーション開始
+// 8. 初期化
 // =================================================================
 
-window.onload = initializeFirebaseAndAuth;
+/**
+ * アプリケーションの初期化
+ */
+function initializeApp() {
+    loadFavoritesFromStorage(); // お気に入りデータを読み込み
+    renderSidebar(); // サイドバーを構築
+}
+
+// ページロード完了後に初期化を実行
+window.onload = initializeApp;
