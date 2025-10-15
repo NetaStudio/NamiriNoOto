@@ -2,19 +2,36 @@
 /* カスタムCSS：Tailwind CSSを補完するカスタムスタイル     */
 /* ---------------------------------------------------- */
 
-/* ヘッダーロゴの調整 */
-.header-logo
+/* ヘッダーロゴの調整 - 画像ごとに個別のサイズを定義 */
+
+/* PNG画像（少し大きめ） */
+.logo-png
 {
-    width: 480px; /* モバイルでのデフォルトサイズを80pxに固定 */
+    width: 400px; /* モバイルでのデフォルトサイズ */
+    height: auto; 
+}
+
+/* GIF画像（少し小さめ） */
+.logo-gif
+{
+    width: 350px; /* モバイルでのデフォルトサイズ */
     height: auto;
+    margin-top: 10px;
 }
 
 /* 768px (mdブレークポイント) 以上の画面サイズでの調整 */
 @media (min-width: 768px)
 {
-    .header-logo
+    /* PNG画像 */
+    .logo-png
     {
-        width: 460px; /* デスクトップサイズでは100pxに固定 */
+        width: 420px; /* デスクトップサイズでは110pxに固定 */
+    }
+    /* GIF画像 */
+    .logo-gif
+    {
+        width: 370px; /* デスクトップサイズでは90pxに固定 */
+        margin-top: 10px;
     }
 }
 
