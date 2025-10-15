@@ -27,17 +27,15 @@
 <body class="min-h-screen p-4 sm:p-8">
     <div id="app" class="max-w-7xl mx-auto bg-white shadow-xl rounded-3xl p-0">
         
-        <!-- 更新: テキストタイトルを画像に置き換え、横並び配置 -->
-        <header class="text-center p-4 sm:p-6 border-b border-gray-200">
-            <!-- flexを使って画像を横並びにし、中央揃え (justify-center) にします -->
-            <div class="flex justify-center items-center space-x-4">
+        <header class="p-4 sm:p-6 border-b border-gray-200">
+            <div class="flex justify-start items-center space-x-4">
                 
                 <!-- PNG画像 (左側) -->
                 <!-- 適切なファイルパスに置き換えてください (例: images/main_logo.png) -->
                 <!-- w-24: 幅96px, h-auto: 高さ自動調整 -->
                 <img 
                     src="images/logo_01.png" 
-                    alt="推しボイスコレクション - ロゴ" 
+                    alt="汐空なみり" 
                     class="w-24 h-auto rounded-lg shadow-md"
                     onerror="this.onerror=null;this.src='https://placehold.co/96x96/e3e6f0/1f4c9b?text=PNG';"
                 >
@@ -47,14 +45,11 @@
                 <!-- w-24: 幅96px, h-auto: 高さ自動調整 -->
                 <img 
                     src="images/logo_02.gif" 
-                    alt="推しボイスコレクション - アニメーション" 
+                    alt="Library" 
                     class="w-24 h-auto rounded-lg shadow-md"
                     onerror="this.onerror=null;this.src='https://placehold.co/96x96/e3e6f0/1f4c9b?text=GIF';"
                 >
-                
             </div>
-            <!-- 必要であれば、ここにサブタイトルなどを追加できます -->
-            <p class="text-sm text-gray-500 mt-2">あなたの推しの声を集めよう！</p>
         </header>
 
         <!-- メインコンテンツエリア (2カラムレイアウト) -->
@@ -83,3 +78,4 @@
     <script src="script.js"></script>
 </body>
 </html>
+
