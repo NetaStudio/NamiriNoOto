@@ -16,11 +16,11 @@
 /* GIF画像（少し小さめ） */
 .logo-gif
 {
-    width: 140px; /* モバイルでのデフォルトサイズ */
+    width: 150px; /* モバイルでのデフォルトサイズ */
     height: auto;
     object-fit: contain;
     vertical-align: middle;
-    margin-top: 40px;
+    margin-top: 20px;
 }
 
 /* 768px (mdブレークポイント) 以上の画面サイズでの調整 */
@@ -29,12 +29,12 @@
     /* PNG画像 */
     .logo-png
     {
-        width: 320px; /* デスクトップサイズでは320pxに固定 */
+        width: 320px; /* デスクトップサイズでは110pxに固定 */
     }
     /* GIF画像 */
     .logo-gif
     {
-        width: 170px; /* デスクトップサイズでは170pxに固定 */
+        width: 170px; /* デスクトップサイズでは90pxに固定 */
         margin-top: 20px;
     }
 }
@@ -43,13 +43,9 @@
 .voice-button
 {
     width: 100%;
-    /* 修正: 2行表示のために高さを増やし、折り返しを許可 */
-    height: 80px; /* 60pxから変更し、2行分のスペースを確保 */
-    white-space: normal; /* テキストの折り返しを許可 */
-    text-align: center; /* 複数行になった場合のテキストを中央揃えにする */
-    
+    height: 30px;
     padding: 1rem;
-    border-radius: 0.375rem; /* 角の丸み */
+    border-radius: 0.3rem; /* 角の丸み */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -63,7 +59,7 @@
     font-weight: 500; /* font-bold */
     color: #ffffff;
     background-image: linear-gradient(135deg, #1c3e7c 0%, #679ad3 100%);
-    box-shadow: 0 8px 15px rgba(25, 60, 110, 0.4), 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 8px rgba(25, 60, 110, 0.4), 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 /* カーソルを合わせた時 */
@@ -76,7 +72,7 @@
 .voice-button:active
 {
     transform: translateY(2px) scale(0.98); /* 少し沈み込むアニメーション */
-    box-shadow: 0 2px 8px rgba(0, 60, 160, 0.5), 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 4px rgba(0, 60, 160, 0.5), 0 0px 1px rgba(0, 0, 0, 0.05);
 }
 
 /* Gridの調整（モバイルでの見やすさ） */
@@ -91,21 +87,35 @@
 /* ---------------------------------------------------- */
 /* カテゴリ */
 /* ---------------------------------------------------- */
-.category-button 
+.category-link
 {
-    color: #4b5563; /* text-gray-600 */
-    font-weight: 500;
+    width: 100%;
+    text-align: left;
+    padding: 10px 15px;
+    margin-bottom: 4px;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    color: #4b5563; /* 灰色 */
+    background-color: transparent;
+    transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+    border: none;
+    cursor: pointer;
+    /* ブロック要素にして縦に並べる */
+    display: block; 
 }
 
-.category-button:hover
+/* カーソル中のカテゴリ */
+.category-link:hover
 {
-    background-color: #e5e7eb; /* hover:bg-gray-200 */
+    background-color: #d4f2ff; /* 水色 */
+    color: #1a3e7c; /* 紺色 */
 }
 
 /* 選択中のカテゴリ */
-.category-button.is-active
+.category-link.selected
 {
-    background-color: #fce7f3; /* bg-pink-100 */
-    color: #db2777; /* text-pink-600 */
-    font-weight: 600; /* font-semibold */
+    background-color: #b8e3ff; /* 水色 */
+    color: #1f4c9b; /* 紺色 */
+    font-weight: 700;
+    box-shadow: inset 3px 0 0 0 #183684; /* 左側に線の強調 */
 }
