@@ -77,11 +77,12 @@
 /* 選択中のカテゴリ */
 .category-link.selected
 {
-    background-color: #a7d4e8; /* 水色 */
-    color: #1f4587; /* 紺色 */
+    background-color: #bcdcf1; /* 水色 */
+    color: #1f4c9b; /* 紺色 */
     font-weight: 700;
     box-shadow: inset 3px 0 0 0 #183684; /* 左側に線の強調 */
 }
+
 
 
 
