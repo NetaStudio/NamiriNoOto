@@ -63,7 +63,7 @@ let activeCategory = null;
 document.addEventListener('DOMContentLoaded', () => {
     loadFavoritesFromLocalStorage(); // 最初にローカルストレージからお気に入りを読み込む
     generateAppStructure(VOICE_DATA);
-    attachExportImportListeners(); // 書き出し/読み込みボタンのリスナー設定
+    // attachExportImportListeners() の呼び出しを削除しました
     
     // 初期表示として最初のカテゴリを選択
     if (VOICE_DATA.length > 0) {
@@ -375,103 +375,15 @@ function updateFavoriteIcons() {
 
 
 // =================================================================
-// 4. データ書き出し (Export) / 読み込み (Import) 機能
+// 4. データ書き出し (Export) / 読み込み (Import) 機能 (全て削除)
 // =================================================================
 
 /**
- * 書き出し/読み込みボタンにイベントリスナーを付与
+ * 書き出し/読み込みボタンにイベントリスナーを付与 (この関数は実行されなくなります)
  */
 function attachExportImportListeners() {
-    const exportButton = document.getElementById('export-favorites-btn');
-    const importButton = document.getElementById('import-favorites-btn');
-    
-    if (exportButton) {
-        exportButton.addEventListener('click', exportFavorites);
-    }
-    if (importButton) {
-        importButton.addEventListener('click', () => {
-            document.getElementById('import-file-input').click();
-        });
-        document.getElementById('import-file-input').addEventListener('change', importFavorites);
-    }
-}
-
-/**
- * お気に入りデータをJSONファイルとして書き出す
- */
-function exportFavorites() {
-    if (FAVORITE_VOICES.length === 0) {
-        alert("お気に入りが登録されていません。");
-        return;
-    }
-    
-    const data = JSON.stringify({ favorites: FAVORITE_VOICES }, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'voice_collection_favorites.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-
-/**
- * JSONファイルからお気に入りデータを読み込む
- * @param {Event} event - ファイル選択イベント
- */
-function importFavorites(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    if (file.type !== 'application/json') {
-        alert("JSONファイルを選択してください。");
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const content = e.target.result;
-            const importedData = JSON.parse(content);
-            
-            if (importedData && Array.isArray(importedData.favorites)) {
-                
-                // インポートされたデータが有効かチェック (最低限の検証)
-                const validFavorites = importedData.favorites.filter(item => 
-                    item.soundPath && item.text
-                );
-                
-                if (validFavorites.length > 0) {
-                    // 既存のお気に入りを上書き
-                    FAVORITE_VOICES = validFavorites;
-                    saveFavoritesToLocalStorage();
-                    
-                    // UIを再描画
-                    generateAppStructure(VOICE_DATA);
-                    updateFavoriteIcons();
-                    
-                    alert(`お気に入り ${validFavorites.length} 件を正常に読み込みました。`);
-                    
-                    // お気に入りカテゴリに切り替える
-                    showCategory(FAVORITE_CATEGORY_ID);
-
-                } else {
-                    alert("インポートされたファイルに有効なデータが含まれていません。");
-                }
-            } else {
-                alert("ファイル形式が正しくありません。'favorites'配列が存在することを確認してください。");
-            }
-        } catch (error) {
-            alert("ファイルの解析に失敗しました。ファイルが破損しているか、JSON形式が正しくありません。");
-            console.error("Import error:", error);
-        }
-    };
-    reader.readAsText(file);
-    // ファイル入力の値をリセット
-    event.target.value = ''; 
+    // 関連する処理を全て削除
+    console.log("Export/Import listeners are removed.");
 }
 
 
