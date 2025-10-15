@@ -16,7 +16,7 @@
 /* GIF画像（少し小さめ） */
 .logo-gif
 {
-    width: 150px; /* モバイルでのデフォルトサイズ */
+    width: 140px; /* モバイルでのデフォルトサイズ */
     height: auto;
     object-fit: contain;
     vertical-align: middle;
