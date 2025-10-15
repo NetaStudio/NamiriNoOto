@@ -21,21 +21,21 @@
     border-radius: 1.5rem; /* rounded-3xl */
     font-weight: 500; /* font-bold */
     color: #ffffff;
-    background-image: linear-gradient(135deg, #5174ab 0%, #7eb0d6 100%);
+    background-image: linear-gradient(135deg, #1c3e7c 0%, #679ad3 100%);
     box-shadow: 0 8px 15px rgba(25, 60, 110, 0.4), 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 /* カーソルを合わせた時 */
 .voice-button:hover
 {
-    background-image: linear-gradient(135deg, #486ba1 0%, #80aed2 100%);
+    background-image: linear-gradient(135deg, #3f619e 0%, #8cbaed 100%);
 }
 
 /* ボタンが押されている時 */
 .voice-button:active
 {
     transform: translateY(2px) scale(0.98); /* 少し沈み込むアニメーション */
-    box-shadow: 0 4px 10px rgba(25, 60, 110, 0.5), 0 2px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 8px rgba(0, 60, 160, 0.5), 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 /* Gridの調整（モバイルでの見やすさ） */
@@ -82,5 +82,6 @@
     font-weight: 700;
     box-shadow: inset 3px 0 0 0 #183684; /* 左側に線の強調 */
 }
+
 
 
