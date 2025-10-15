@@ -3,50 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>マイ推しボイスボタン</title>
+    <title>汐空なみりLibrary</title>
     <!-- Tailwind CSSを読み込み (デザインを整えるため) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="style.css">
     <!-- フォント設定 -->
     <style>
-        body {
+        body
+        {
             font-family: 'Inter', sans-serif;
             background-color: #f0f4f8;
         }
         /* メインコンテンツエリアの高さを調整 */
-        #main-content {
+        #main-content
+        {
             height: 100%;
             overflow-y: auto;
         }
         /* 画面全体に対するアプリコンテナの調整 */
-        #app {
-            height: calc(100vh - 4rem); /* 画面の高さから上下のパディングを引いたサイズ */
+        #app
+        {
+            height: calc(100vh - 4rem);
+        }
+        /* サイドバーの高さを調整 (ボタン領域を確保) */
+        #sidebar-inner
+        {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        #category-nav
+        {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-bottom: 1rem; 
         }
     </style>
 </head>
 <body class="min-h-screen p-4 sm:p-8">
     <div id="app" class="max-w-7xl mx-auto bg-white shadow-xl rounded-3xl p-0">
-        
+        <!-- ヘッダーエリア: 画像表示の左上揃えを復元 -->
         <header class="p-4 sm:p-6 border-b border-gray-200">
+            <!-- 画像を横並び、左揃えで配置 -->
             <div class="flex justify-start items-center space-x-4">
                 
                 <!-- PNG画像 (左側) -->
-                <!-- 適切なファイルパスに置き換えてください (例: images/main_logo.png) -->
-                <!-- w-24: 幅96px, h-auto: 高さ自動調整 -->
                 <img 
                     src="images/logo_01.png" 
                     alt="汐空なみり" 
-                    class="w-70 h-auto"
+                    class="w-24 h-auto rounded-lg"
                     onerror="this.onerror=null;this.src='https://placehold.co/96x96/e3e6f0/1f4c9b?text=PNG';"
                 >
                 
                 <!-- GIF画像 (右側) -->
-                <!-- 適切なファイルパスに置き換えてください (例: images/animated_icon.gif) -->
-                <!-- w-24: 幅96px, h-auto: 高さ自動調整 -->
                 <img 
                     src="images/logo_02.gif" 
                     alt="Library" 
-                    class="w-30 h-auto"
+                    class="w-24 h-auto rounded-lg"
                     onerror="this.onerror=null;this.src='https://placehold.co/96x96/e3e6f0/1f4c9b?text=GIF';"
                 >
             </div>
@@ -56,19 +69,18 @@
         <div class="flex h-[calc(100%-72px)]"> 
             
             <!-- 左側: カテゴリサイドバー -->
-            <!-- サイドバーのボタンもJSで動的生成するためにIDを追加 -->
             <aside id="sidebar" class="w-1/4 min-w-[150px] max-w-[250px] border-r border-gray-200 p-4 overflow-y-auto">
-                <h3 class="font-bold text-gray-700 mb-2 border-b pb-1">カテゴリ一覧</h3>
-                <nav id="category-nav">
-                    <!-- JSがここにカテゴリボタンを自動で挿入します -->
-                </nav>
+                <div id="sidebar-inner">
+                    <h3 class="font-bold text-gray-700 mb-2 border-b pb-1">カテゴリ一覧</h3>
+                    <nav id="category-nav">
+                        <!-- JSがここにカテゴリボタンとお気に入りリンクを自動で挿入します -->
+                    </nav>
+                </div>
             </aside>
 
             <!-- 右側: 音声ボタン表示エリア -->
             <main id="main-content" class="w-3/4 p-6">
-                
                 <!-- JSがここにカテゴリセクションを自動で挿入します -->
-                
             </main>
         </div>
 
@@ -78,4 +90,3 @@
     <script src="script.js"></script>
 </body>
 </html>
-
