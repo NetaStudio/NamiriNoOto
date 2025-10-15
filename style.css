@@ -2,24 +2,53 @@
 /* カスタムCSS：Tailwind CSSを補完するカスタムスタイル     */
 /* ---------------------------------------------------- */
 
-/* ヘッダーロゴの調整 - 画像に関する固定幅のCSSは削除し、
-   Tailwindのw-24 h-24が適用されるようにします */
+/* ヘッダーロゴの調整 - 画像ごとに個別のサイズを定義 */
 
+/* PNG画像（少し大きめ） */
+.logo-png
+{
+    width: 300px; /* モバイルでのデフォルトサイズ */
+    height: auto;
+    object-fit: contain;
+    vertical-align: middle;
+}
+
+/* GIF画像（少し小さめ） */
+.logo-gif
+{
+    width: 150px; /* モバイルでのデフォルトサイズ */
+    height: auto;
+    object-fit: contain;
+    vertical-align: middle;
+    margin-top: 20px;
+}
+
+/* 768px (mdブレークポイント) 以上の画面サイズでの調整 */
+@media (min-width: 768px)
+{
+    /* PNG画像 */
+    .logo-png
+    {
+        width: 320px; /* デスクトップサイズでは110pxに固定 */
+    }
+    /* GIF画像 */
+    .logo-gif
+    {
+        width: 170px; /* デスクトップサイズでは90pxに固定 */
+        margin-top: 20px;
+    }
+}
 
 /* 音声ボタン */
 .voice-button
 {
     width: 100%;
-    height: 30px;
+    height: 60px; /* 高さを少し調整 */
     padding: 1rem;
     border-radius: 0.375rem; /* 角の丸み */
-    
-    /* 修正点 1: 文字とアイコンの左寄せ */
     display: flex;
     align-items: center;
-    justify-content: flex-start; /* ★左寄せに変更★ */
-    gap: 0.5rem; /* テキストと星マークの間隔 */
-
+    justify-content: space-between; /* テキストと星を左右に配置 */
     transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, background-color 0.2s;
     border: none;
     cursor: pointer;
@@ -46,16 +75,6 @@
     box-shadow: 0 1px 4px rgba(0, 60, 160, 0.5), 0 0px 1px rgba(0, 0, 0, 0.05);
 }
 
-/* 修正点 2 & 3: 星マーク（お気に入りアイコン）のスタイルを調整 */
-/* お気に入りアイコンをボタンの垂直方向中央に配置 */
-.voice-button .favorite-icon
-{
-    font-size: 1.25rem; /* アイコンサイズを大きく */
-    line-height: 1; /* 行の高さを1に設定して、中央揃えを助ける */
-    /* flexコンテナ（voice-button）のalign-items: center; により、垂直方向の中央揃えが機能します */
-}
-
-
 /* Gridの調整（モバイルでの見やすさ） */
 @media (max-width: 639px)
 {
@@ -68,140 +87,39 @@
 /* ---------------------------------------------------- */
 /* カテゴリ */
 /* ---------------------------------------------------- */
-.category-button
+.category-button 
 {
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    margin-bottom: 0.5rem;
-    border-radius: 0.5rem;
-    text-align: left;
-    transition: background-color 0.15s, color 0.15s;
-    cursor: pointer;
-    font-weight: 600;
-    color: #4a5568; /* gray-700 */
-    background-color: #f7fafc; /* gray-50 */
-    border: 1px solid #edf2f7; /* gray-200 */
+    color: #4b5563; /* text-gray-600 */
+    font-weight: 500;
 }
 
 .category-button:hover
 {
-    background-color: #e2e8f0; /* gray-200 */
-    color: #2d3748; /* gray-800 */
+    background-color: #e5e7eb; /* hover:bg-gray-200 */
 }
 
-/* 現在選択されているカテゴリのスタイル */
-.category-button.active
+/* 選択中のカテゴリ */
+.category-button.is-active
 {
-    background-color: #d53f8c; /* pink-600 */
-    color: #ffffff;
-    border-color: #d53f8c;
-    box-shadow: 0 4px 6px rgba(213, 63, 140, 0.3);
+    background-color: #fce7f3; /* bg-pink-100 */
+    color: #db2777; /* text-pink-600 */
+    font-weight: 600; /* font-semibold */
 }
-
-.category-button.active:hover
-{
-    background-color: #c026d3; /* purple-600 */
-}
-
-/* お気に入りフォルダ (Favorite Folder) の特別なスタイル */
-.favorite-folder
-{
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0.75rem;
-    margin-bottom: 0.5rem;
-    border-radius: 0.5rem;
-    transition: background-color 0.15s;
-    cursor: pointer;
-    background-color: #fff7ed; /* orange-50 */
-    color: #dd6b20; /* orange-600 */
-    border: 1px dashed #fed7aa; /* orange-200 */
-    font-weight: 700;
-}
-
-.favorite-folder:hover
-{
-    background-color: #ffedd5; /* orange-100 */
-}
-
-.favorite-folder-buttons
-{
-    display: flex;
-    gap: 0.5rem;
-}
-
-.favorite-folder-buttons button
-{
-    padding: 0;
-    margin: 0;
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 1rem;
-    line-height: 1;
-    color: inherit;
-    transition: color 0.15s;
-}
-
-.favorite-folder-buttons button:hover
-{
-    color: #e53e3e; /* red-600 */
-}
-
-.favorite-folder-buttons button.edit-btn:hover
-{
-    color: #3182ce; /* blue-600 */
-}
-
 
 /* ---------------------------------------------------- */
-/* モーダル（カスタムアラート） */
+/* お気に入りボタン (星アイコン) のスタイル */
 /* ---------------------------------------------------- */
 
-.modal-backdrop
-{
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
+.favorite-wrapper {
+    /* is-favoriteクラスがない場合のデフォルト (ホバー時の透明な背景を維持) */
+    background-color: transparent;
 }
 
-.modal-content
-{
-    background-color: white;
-    padding: 1.5rem;
-    border-radius: 0.75rem;
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-    width: 90%;
-    max-width: 400px;
-    animation: fadeIn 0.3s ease-out;
+/* お気に入り登録済み (is-favorite) の場合は背景を少し濃くする */
+.favorite-wrapper.is-favorite {
+    background-color: rgba(255, 255, 255, 0.2); /* 白の透明度を上げてハイライト */
 }
 
-@keyframes fadeIn
-{
-    from
-    {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to
-    {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.modal-buttons
-{
-    display: flex;
-    justify-content: flex-end;
-    gap: 1rem;
-    margin-top: 1.5rem;
+.favorite-wrapper:hover {
+    background-color: rgba(255, 255, 255, 0.4); /* ホバーでさらに強調 */
 }
