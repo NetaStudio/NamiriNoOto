@@ -98,7 +98,7 @@ function generateAppStructure(data) {
 
         // タイトル
         const title = document.createElement('h2');
-        title.className = 'text-2xl font-bold text-gray-700 mb-4 pb-2 border-b-2 border-pink-300';
+        title.className = 'text-2xl font-bold text-gray-700 mb-4 pb-2 border-b-2 border-blue-400';
         title.textContent = `${category.name} (${category.en_name})`;
         section.appendChild(title);
 
@@ -217,3 +217,4 @@ async function playAudioWithRetry(url, retries = 3) {
         }
     }
 }
+
