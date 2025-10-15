@@ -1,12 +1,13 @@
 /* ---------------------------------------------------- */
-/* カスタムCSS：Tailwind CSSを補完するカスタムスタイル */
+/* カスタムCSS：Tailwind CSSを補完するカスタムスタイル     */
 /* ---------------------------------------------------- */
 
-/* 全体のボタンに適用するスタイル (音声ボタン) */
-.voice-button {
+/* 音声ボタン */
+.voice-button
+{
     /* Tailwindのクラスと併用するため、最低限のスタイルを定義 */
     width: 100%;
-    min-height: 100px; /* タッチしやすいサイズ */
+    min-height: 50px; /* タッチしやすいサイズ */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -19,62 +20,64 @@
     border-radius: 1.5rem; /* rounded-3xl */
     font-weight: 700; /* font-bold */
     color: #ffffff;
-    background-image: linear-gradient(135deg, #f768b5 0%, #ff839a 100%);
-    box-shadow: 0 8px 15px rgba(247, 104, 181, 0.4), 0 4px 6px rgba(0, 0, 0, 0.1);
+    background-image: linear-gradient(135deg, #33568d 0%, #6a9cc2 100%);
+    box-shadow: 0 8px 15px rgba(25, 60, 110, 0.4), 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-/* ボタンがアクティブ（押されている）時のスタイル */
-.voice-button:active {
+/* カーソルを合わせた時 */
+.voice-button:hover
+{
+    background-image: linear-gradient(135deg, #486ba1 0%, #80aed2 100%);
+}
+
+/* ボタンが押されている時 */
+.voice-button:active
+{
     transform: translateY(2px) scale(0.98); /* 少し沈み込むアニメーション */
-    box-shadow: 0 4px 10px rgba(247, 104, 181, 0.5), 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-/* ホバー時のスタイル（PCでの操作性向上） */
-.voice-button:hover {
-    background-image: linear-gradient(135deg, #ff7abf 0%, #ff95a8 100%);
+    box-shadow: 0 4px 10px rgba(25, 60, 110, 0.5), 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 /* Gridの調整（モバイルでの見やすさ） */
-@media (max-width: 639px) {
-    .voice-grid {
+@media (max-width: 639px)
+{
+    .voice-grid
+    {
         grid-template-columns: 1fr 1fr; /* スマホでは2列にする */
     }
 }
 
-
 /* ---------------------------------------------------- */
-/* カテゴリリンク（サイドバーのボタン）のスタイル */
+/* カテゴリ */
 /* ---------------------------------------------------- */
-
-.category-link {
+.category-link
+{
     width: 100%;
     text-align: left;
     padding: 10px 15px;
     margin-bottom: 4px;
     border-radius: 0.5rem;
     font-size: 1rem;
-    color: #4b5563; /* text-gray-700 */
+    color: #4b5563; /* 灰色 */
     background-color: transparent;
     transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
     border: none;
     cursor: pointer;
-    
-    /* 🚨 修正ポイント: ブロック要素にして縦に並べる */
+    /* ブロック要素にして縦に並べる */
     display: block; 
 }
 
-/* ホバー時 */
-.category-link:hover {
+/* カーソル中のカテゴリ */
+.category-link:hover
+{
     background-color: #d4f2ff; /* 水色 */
     color: #1a3e7c; /* 紺色 */
 }
 
-/* 選択されているカテゴリ */
-.category-link.selected {
+/* 選択中のカテゴリ */
+.category-link.selected
+{
     background-color: #97cef2; /* 水色 */
     color: #183684; /* 紺色 */
     font-weight: 700;
     box-shadow: inset 3px 0 0 0 #183684; /* 左側に線の強調 */
 }
-
-
