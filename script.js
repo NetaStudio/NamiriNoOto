@@ -191,7 +191,7 @@ function createVoiceSection(container, category, voices, isFavoriteSection = fal
             
             // 1. テキスト
             const span = document.createElement('span');
-            span.className = 'text-lg truncate'; // 長すぎるテキストを省略
+            span.className = 'text-base truncate'; // 長すぎるテキストを省略
             span.textContent = text;
             button.appendChild(span);
 
