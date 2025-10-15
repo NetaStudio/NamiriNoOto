@@ -5,7 +5,7 @@
 /* ヘッダーロゴの調整 */
 .header-logo
 {
-    width: 480px; /* モバイルでのデフォルトサイズを80pxに固定 */
+    width: 640px; /* モバイルでのデフォルトサイズを80pxに固定 */
     height: auto;
 }
 
@@ -24,7 +24,7 @@
     width: 100%;
     height: 30px;
     padding: 1rem;
-    border-radius: 0.375rem; /* 角の丸み */
+    border-radius: 0.3rem; /* 角の丸み */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -98,3 +98,4 @@
     font-weight: 700;
     box-shadow: inset 3px 0 0 0 #183684; /* 左側に線の強調 */
 }
+
