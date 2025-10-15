@@ -35,7 +35,7 @@
 .voice-button:active
 {
     transform: translateY(2px) scale(0.98); /* 少し沈み込むアニメーション */
-    box-shadow: 0 2px 8px rgba(0, 60, 160, 0.5), 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 4px rgba(0, 60, 160, 0.5), 0 0px 1px rgba(0, 0, 0, 0.05);
 }
 
 /* Gridの調整（モバイルでの見やすさ） */
@@ -82,4 +82,3 @@
     font-weight: 700;
     box-shadow: inset 3px 0 0 0 #183684; /* 左側に線の強調 */
 }
-
