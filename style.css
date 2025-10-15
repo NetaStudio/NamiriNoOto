@@ -7,7 +7,7 @@
 /* PNG画像（少し大きめ） */
 .logo-png
 {
-    width: 300px; /* モバイルでのデフォルトサイズ */
+    width: 450px; /* モバイルでのデフォルトサイズを300px -> 450pxに拡大 */
     height: auto;
     object-fit: contain;
     vertical-align: middle;
@@ -16,7 +16,7 @@
 /* GIF画像（少し小さめ） */
 .logo-gif
 {
-    width: 150px; /* モバイルでのデフォルトサイズ */
+    width: 225px; /* モバイルでのデフォルトサイズを150px -> 225pxに拡大 */
     height: auto;
     object-fit: contain;
     vertical-align: middle;
@@ -29,12 +29,12 @@
     /* PNG画像 */
     .logo-png
     {
-        width: 320px; /* デスクトップサイズでは110pxに固定 */
+        width: 480px; /* デスクトップサイズを320px -> 480pxに拡大 */
     }
     /* GIF画像 */
     .logo-gif
     {
-        width: 170px; /* デスクトップサイズでは90pxに固定 */
+        width: 255px; /* デスクトップサイズを170px -> 255pxに拡大 */
         margin-top: 20px;
     }
 }
