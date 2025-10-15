@@ -20,7 +20,8 @@
     height: auto;
     object-fit: contain;
     vertical-align: middle;
-    margin-top: 80px;
+    margin-top: 60px;
+    margin-left: -50px; 
 }
 
 /* 768px (mdブレークポイント) 以上の画面サイズでの調整 */
@@ -119,5 +120,3 @@
     font-weight: 700;
     box-shadow: inset 3px 0 0 0 #183684; /* 左側に線の強調 */
 }
-
-
