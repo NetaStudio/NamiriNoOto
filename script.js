@@ -246,7 +246,7 @@ function updateFavoriteSection() {
     const voiceMap = getFullVoiceMap();
     
     // お気に入りカテゴリの再生成
-    const favoriteCategory = { id: FAVORITE_CATEGORY_ID, name: "お気に入り", en_name: "Favorite", folder: "" };
+    const favoriteCategory = { id: FAVORITE_CATEGORY_ID, name: "お気に入り(Bookmark)", folder: "" };
     createVoiceSection(mainContainer, favoriteCategory, FAVORITE_VOICES, true, voiceMap);
 
     // アイコンの状態を再更新
