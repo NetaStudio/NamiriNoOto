@@ -8,7 +8,8 @@
 .logo-png
 {
     width: 400px; /* モバイルでのデフォルトサイズ */
-    height: auto; 
+    height: auto;
+    object-fit: contain;
 }
 
 /* GIF画像（少し小さめ） */
@@ -16,7 +17,8 @@
 {
     width: 350px; /* モバイルでのデフォルトサイズ */
     height: auto;
-    margin-top: 10px;
+    object-fit: contain;
+    margin-top: 40px;
 }
 
 /* 768px (mdブレークポイント) 以上の画面サイズでの調整 */
@@ -31,7 +33,7 @@
     .logo-gif
     {
         width: 370px; /* デスクトップサイズでは90pxに固定 */
-        margin-top: 10px;
+        margin-top: 40px;
     }
 }
 
