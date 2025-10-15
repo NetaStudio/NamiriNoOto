@@ -37,99 +37,18 @@
         <div class="flex h-[calc(100%-72px)]"> 
             
             <!-- 左側: カテゴリサイドバー -->
+            <!-- サイドバーのボタンもJSで動的生成するためにIDを追加 -->
             <aside id="sidebar" class="w-1/4 min-w-[150px] max-w-[250px] border-r border-gray-200 p-4 overflow-y-auto">
                 <h3 class="font-bold text-gray-700 mb-2 border-b pb-1">カテゴリ一覧</h3>
-                <nav>
-                    <!-- カテゴリリストのボタン (data-target属性で対応するセクションIDを指定) -->
-                    <!-- 最初のカテゴリは "selected" クラスを付けてデフォルトで選択状態にしておく -->
-                    <button class="category-link selected" data-target="category-greeting">
-                        挨拶
-                    </button>
-                    <button class="category-link" data-target="category-affirmation">
-                        肯定
-                    </button>
-                    <button class="category-link" data-target="category-denial">
-                        否定
-                    </button>
-                    <button class="category-link" data-target="category-reaction">
-                        罵倒、煽り
-                    </button>
-                    <!-- 他のカテゴリを追加する場合はここにボタンを追加 -->
+                <nav id="category-nav">
+                    <!-- JSがここにカテゴリボタンを自動で挿入します -->
                 </nav>
             </aside>
 
             <!-- 右側: 音声ボタン表示エリア -->
             <main id="main-content" class="w-3/4 p-6">
                 
-                <!-- カテゴリセクション 1: 挨拶 -->
-                <!-- IDはサイドバーのdata-targetと一致させる -->
-                <section id="category-greeting" class="category-section">
-                    <h2 class="text-2xl font-bold text-gray-700 mb-4 pb-2 border-b-2 border-pink-300">
-                        挨拶 (Greeting)
-                    </h2>
-                    <div class="voice-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        
-                        <!-- 🚨 data-soundには "sounds/" フォルダより下の階層を記述 -->
-                        <button class="voice-button" data-sound="01_greeting/baka1.wav">
-                            <span class="text-lg">おはよう</span>
-                        </button>
-
-                        <button class="voice-button" data-sound="02_positive/baka2.wav">
-                            <span class="text-lg">こんにちは</span>
-                        </button>
-                        
-                    </div>
-                </section>
-                
-                <!-- カテゴリセクション 2: 肯定 (デフォルトで非表示) -->
-                <section id="category-affirmation" class="category-section hidden">
-                    <h2 class="text-2xl font-bold text-gray-700 mb-4 pb-2 border-b-2 border-pink-300">
-                        肯定 (Affirmation)
-                    </h2>
-                    <div class="voice-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        
-                        <button class="voice-button" data-sound="02_positive/baka2.wav">
-                            <span class="text-lg">いいね！</span>
-                        </button>
-
-                        <button class="voice-button" data-sound="03_negative/baka3.wav">
-                            <span class="text-lg">うんうん</span>
-                        </button>
-                        
-                    </div>
-                </section>
-                
-                <!-- カテゴリセクション 3: 否定 (デフォルトで非表示) -->
-                <section id="category-denial" class="category-section hidden">
-                    <h2 class="text-2xl font-bold text-gray-700 mb-4 pb-2 border-b-2 border-pink-300">
-                        否定 (Denial)
-                    </h2>
-                    <div class="voice-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        
-                        <!-- 既存のボタン -->
-                        <button class="voice-button" data-sound="01_greeting/baka1.wav">
-                            <span class="text-lg">そうじゃない</span>
-                        </button>
-                        
-                        <!-- 新規追加のサンプル -->
-                        <button class="voice-button" data-sound="01_greeting/baka1.wav">
-                            <span class="text-lg">だめ！</span>
-                        </button>
-                        
-                        <button class="voice-button" data-sound="01_greeting/baka1.wav">
-                            <span class="text-lg">それは違う</span>
-                        </button>
-                        
-                    </div>
-                </section>
-                
-                <!-- カテゴリセクション 4: リアクション (デフォルトで非表示) -->
-                <section id="category-reaction" class="category-section hidden">
-                    <h2 class="text-2xl font-bold text-gray-700 mb-4 pb-2 border-b-2 border-pink-300">
-                        返答、リアクション (Reaction)
-                    </h2>
-                    <div class="text-gray-400 mt-4">（このカテゴリにはまだボイスがありません）</div>
-                </section>
+                <!-- JSがここにカテゴリセクションを自動で挿入します -->
                 
             </main>
         </div>
