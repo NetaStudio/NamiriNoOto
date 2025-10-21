@@ -150,7 +150,7 @@ const VOICE_DATA =
 ];
 
 // =================================================================
-// 2. お気に入り機能の管理 (Arrayに変更し、順序を保持)
+// 2. メモ機能の管理 (Arrayに変更し、順序を保持)
 // =================================================================
 
 const FAVORITES_KEY = 'voiceLibraryFavorites';
@@ -161,7 +161,7 @@ let draggedItem = null;
 let isDroppingAfterTarget = false;
 
 /**
- * ローカルストレージからお気に入りデータを読み込む
+ * ローカルストレージからメモデータを読み込む
  */
 function loadFavoritesFromLocalStorage() {
     const savedFavorites = localStorage.getItem(FAVORITES_KEY);
@@ -180,7 +180,7 @@ function loadFavoritesFromLocalStorage() {
 }
 
 /**
- * お気に入りデータをローカルストレージに保存する
+ * メモデータをローカルストレージに保存する
  */
 function saveFavoritesToLocalStorage() {
     // Arrayを保存
@@ -188,7 +188,7 @@ function saveFavoritesToLocalStorage() {
 }
 
 /**
- * お気に入りに登録されているかチェック
+ * メモに登録されているかチェック
  * @param {string} voiceId - ボイスのユニークID
  */
 function isFavorite(voiceId) {
@@ -196,7 +196,7 @@ function isFavorite(voiceId) {
 }
 
 /**
- * お気に入り状態を切り替える (アイコン同期と登録順維持に対応)
+ * メモ状態を切り替える (アイコン同期と登録順維持に対応)
  * @param {string} voiceId - ボイスのユニークID (folder/file.wav)
  * @param {Event} event - クリックイベント
  */
@@ -219,10 +219,10 @@ function toggleFavorite(voiceId, event) {
     // Point 1: 全てのボタンの状態を更新
     updateAllVoiceButtonStates();
     
-    // Point 2: お気に入りカテゴリの表示を更新 (登録順に再描画)
+    // Point 2: メモカテゴリの表示を更新 (登録順に再描画)
     updateFavoriteCategory();
 
-    // ★修正★: 現在アクティブなカテゴリがお気に入りの場合、空になったらメッセージが表示されるよう再描画を強制する
+    // ★修正★: 現在アクティブなカテゴリがメモの場合、空になったらメッセージが表示されるよう再描画を強制する
     const activeLink = document.querySelector('.category-link.selected');
     if (activeLink && activeLink.getAttribute('data-category-id') === 'category-favorites') {
         showCategory('category-favorites');
@@ -230,7 +230,7 @@ function toggleFavorite(voiceId, event) {
 }
 
 /**
- * 全てのボイスボタンのお気に入りアイコンの状態を更新する (Point 1対応)
+ * 全てのボイスボタンのメモアイコンの状態を更新する (Point 1対応)
  */
 function updateAllVoiceButtonStates() {
     // DOMにあるすべてのボイスボタンを取得
@@ -257,7 +257,7 @@ function updateAllVoiceButtonStates() {
 }
 
 /**
- * お気に入りに追加されているボイスデータを取得する (Point 2対応: 登録順にデータを取得)
+ * メモに追加されているボイスデータを取得する (Point 2対応: 登録順にデータを取得)
  */
 function getFavoriteVoices() {
     const favoriteList = [];
@@ -283,7 +283,7 @@ function getFavoriteVoices() {
 }
 
 /**
- * ★更新機能★: お気に入りリストをクリアする
+ * ★更新機能★: メモリストをクリアする
  */
 function clearFavorites() {
     // 1. favorites配列を空にする
@@ -295,10 +295,10 @@ function clearFavorites() {
     // 3. 全てのボタンの状態を更新 (★マークを☆マークに戻す)
     updateAllVoiceButtonStates();
 
-    // 4. お気に入りカテゴリの表示を更新 (「お気に入りなし」の状態にする)
+    // 4. メモカテゴリの表示を更新 (「メモなし」の状態にする)
     updateFavoriteCategory();
 
-    // 5. 現在アクティブなカテゴリがお気に入りの場合、クリア後の画面を強制的に再表示
+    // 5. 現在アクティブなカテゴリがメモの場合、クリア後の画面を強制的に再表示
     const activeLink = document.querySelector('.category-link.selected');
     if (activeLink && activeLink.getAttribute('data-category-id') === 'category-favorites') {
         showCategory('category-favorites');
@@ -326,7 +326,7 @@ function createVoiceButton(categoryFolder, voice, isDraggable = false) {
     // ボタン全体でのクリックを音声再生に割り当て
     button.setAttribute('onclick', `handleVoiceButtonClick('${voiceId}')`);
 
-    // ドラッグ＆ドロップ用属性 (お気に入りカテゴリでのみ有効)
+    // ドラッグ＆ドロップ用属性 (メモカテゴリでのみ有効)
     if (isDraggable) {
         button.setAttribute('draggable', 'true');
     }
@@ -338,7 +338,7 @@ function createVoiceButton(categoryFolder, voice, isDraggable = false) {
     textContent.textContent = voice.text;
     button.appendChild(textContent);
 
-    // お気に入りアイコン
+    // メモアイコン
     const iconSpan = document.createElement('span');
     iconSpan.className = 'favorite-icon text-xl transition-colors duration-150';
     
@@ -347,7 +347,7 @@ function createVoiceButton(categoryFolder, voice, isDraggable = false) {
     if(isFav)
     {
         iconSpan.textContent = '★';
-        // お気に入りの場合は黄色を適用
+        // メモの場合は黄色を適用
         iconSpan.classList.add('text-yellow-400'); 
     }else
     {
@@ -355,7 +355,7 @@ function createVoiceButton(categoryFolder, voice, isDraggable = false) {
         iconSpan.classList.add('text-gray-300');
     }
 
-    //お気に入りボタンのクリックイベントはトグル機能のみを実行
+    //メモボタンのクリックイベントはトグル機能のみを実行
     iconSpan.setAttribute('onclick', `toggleFavorite('${voiceId}', event)`);
 
     button.appendChild(iconSpan);
@@ -400,8 +400,8 @@ function createCategorySection(category) {
 }
 
 /**
- * お気に入りカテゴリのセクションを作成する (登録順に表示)
- * @param {Array<Object>} favoriteVoices - 登録順に並んだお気に入りのボイスデータ
+ * メモカテゴリのセクションを作成する (登録順に表示)
+ * @param {Array<Object>} favoriteVoices - 登録順に並んだメモのボイスデータ
  */
 function createFavoriteCategorySection(favoriteVoices) {
     const section = document.createElement('section');
@@ -413,11 +413,11 @@ function createFavoriteCategorySection(favoriteVoices) {
     
     // 日本語タイトル
     const jpTitle = document.createElement('span');
-    jpTitle.textContent = 'お気に入り';
+    jpTitle.textContent = 'メモ';
     jpTitle.className = 'mr-2';
     titleContainer.appendChild(jpTitle);
     
-    // お気に入り (Bookmark) の英語表記を追加
+    // メモ (Bookmark) の英語表記を追加
     const enTitle = document.createElement('span');
     enTitle.textContent = `(Bookmark)`;
     enTitle.className = 'text-lg font-normal text-gray-400'; // 薄い文字色とフォントサイズ
@@ -427,22 +427,22 @@ function createFavoriteCategorySection(favoriteVoices) {
 
     if(favoriteVoices.length === 0)
     {
-        // お気に入りが一つもない場合のメッセージ
+        // メモが一つもない場合のメッセージ
         const message = document.createElement('p');
         message.className = 'text-gray-500 mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200';
-        message.textContent = 'お気に入りのボイスはまだ登録されていません。☆マークを押して登録できます。';
+        message.textContent = 'メモのボイスはまだ登録されていません。☆マークを押して登録できます。';
         section.appendChild(message);
     }
     else
     {
-        //お気に入りがある場合、ドラッグ可能なボタンをグリッド表示
+        //メモがある場合、ドラッグ可能なボタンをグリッド表示
         const grid = document.createElement('div');
         grid.id = 'favorites-grid';
         grid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4';
         section.appendChild(grid);
 
         favoriteVoices.forEach(item => {
-            // お気に入りのボイスボタンはドラッグ可能に設定
+            // メモのボイスボタンはドラッグ可能に設定
             grid.appendChild(createVoiceButton(item.folder, item.voice, true));
         });
 
@@ -454,18 +454,18 @@ function createFavoriteCategorySection(favoriteVoices) {
 }
 
 /**
- * お気に入りカテゴリの内容を更新・再描画する
+ * メモカテゴリの内容を更新・再描画する
  */
 function updateFavoriteCategory() {
     const mainContent = document.getElementById('main-content');
     const oldFavoriteSection = document.getElementById('category-favorites');
 
-    // 既存のお気に入りセクションを削除
+    // 既存のメモセクションを削除
     if (oldFavoriteSection) {
         mainContent.removeChild(oldFavoriteSection);
     }
 
-    // 新しいお気に入りセクションを作成して挿入
+    // 新しいメモセクションを作成して挿入
     const favoriteVoices = getFavoriteVoices();
     const newFavoriteSection = createFavoriteCategorySection(favoriteVoices);
     // メインコンテンツの最後に挿入
@@ -503,23 +503,23 @@ function generateAppStructure(data) {
         // コンテンツセクション
         mainContent.appendChild(createCategorySection(category));
 
-        // 最初のカテゴリを設定 (お気に入り以外の最初のカテゴリをデフォルトとする)
+        // 最初のカテゴリを設定 (メモ以外の最初のカテゴリをデフォルトとする)
         if (!firstCategoryId) {
             firstCategoryId = category.id;
         }
     });
 
-    // 2. 通常カテゴリとお気に入りの間に区切り線を追加
+    // 2. 通常カテゴリとメモの間に区切り線を追加
     const separator = document.createElement('div');
     separator.className = 'border-t border-gray-200 my-2 pt-2'; // 線の色とマージンを設定
     categoryNav.appendChild(separator);
 
-    // 3. お気に入りカテゴリのナビゲーションリンクを作成 (カテゴリリストの最後に移動)
+    // 3. メモカテゴリのナビゲーションリンクを作成 (カテゴリリストの最後に移動)
     const favoriteLink = document.createElement('a');
     favoriteLink.href = '#';
     favoriteLink.className = 'category-link block px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition duration-150 mb-1';
     // リンク内の「★」を黄色にする 
-    favoriteLink.innerHTML = '<span class="text-yellow-500">★</span> お気に入り'; 
+    favoriteLink.innerHTML = '<span class="text-yellow-500">★</span> メモ'; 
     favoriteLink.setAttribute('data-category-id', 'category-favorites');
     favoriteLink.onclick = (e) => {
         e.preventDefault();
@@ -527,11 +527,11 @@ function generateAppStructure(data) {
     };
     categoryNav.appendChild(favoriteLink);
 
-    // 4. お気に入りカテゴリのコンテンツを作成 (最初に一度だけ生成、以降は更新)
+    // 4. メモカテゴリのコンテンツを作成 (最初に一度だけ生成、以降は更新)
     updateFavoriteCategory();
 
 
-    // 5. 初期表示カテゴリを設定 (お気に入り以外の最初のカテゴリ)
+    // 5. 初期表示カテゴリを設定 (メモ以外の最初のカテゴリ)
     if (firstCategoryId) {
         showCategory(firstCategoryId);
     }
@@ -544,7 +544,7 @@ function generateAppStructure(data) {
 
 /**
  * ドラッグ&ドロップイベントリスナーを設定
- * @param {HTMLElement} grid - お気に入りボタンを含むコンテナ (favorites-grid)
+ * @param {HTMLElement} grid - メモボタンを含むコンテナ (favorites-grid)
  */
 function setupDragAndDrop(grid) {
     if (!grid) return;
@@ -723,7 +723,7 @@ async function playAudioWithRetry(url, retries = 3) {
 
 // DOMのロード完了を待ってから実行
 document.addEventListener('DOMContentLoaded', () => {
-    loadFavoritesFromLocalStorage(); // 最初にローカルストレージからお気に入りを読み込む
+    loadFavoritesFromLocalStorage(); // 最初にローカルストレージからメモを読み込む
     generateAppStructure(VOICE_DATA);
 
     // 初期化時に全てのボタンの星の状態を同期

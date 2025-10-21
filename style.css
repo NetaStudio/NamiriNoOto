@@ -168,10 +168,33 @@
     font-weight: 600;
 }
 
-.category-link.selected:hover
-{
-    background-color: #4362a5; 
-    color: #ffffff;
+/* ---------------------------------------------------- */
+/* カテゴリリンクのホバー/選択時のスタイル調整 */
+/* ---------------------------------------------------- */
 
+/* 1. モバイル/デフォルト: 選択状態の要素にhover/activeが発生しても、選択時の色を維持する */
+.category-link.selected:hover,
+.category-link.selected:active
+{
+    /* モバイルでの誤発火対策: 選択時の色を維持する */
+    background-color: #cae4fa !important; 
+    color: #334c8f !important;
 }
 
+/* 2. PC (sm: 640px以上) のみ: 選択中のカテゴリにカーソルを合わせた時のカスタムスタイル */
+@media (min-width: 640px)
+{
+    .category-link.selected:hover
+    {
+        /* PCで選択中のリンクにホバーした時の色 */
+        background-color: #4362a5 !important;
+        color: #ffffff !important;
+    }
+
+    /* 非選択状態のリンクのPC向けhoverスタイル */
+    .category-link:not(.selected):hover
+    {
+        background-color: #e2ecf5; 
+        color: #394363;
+    }
+}
