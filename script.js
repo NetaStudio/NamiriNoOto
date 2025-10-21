@@ -38,6 +38,114 @@ const VOICE_DATA =
             { text: "だめ！", file: "denial2.wav" },
             { text: "それは違う", file: "denial3.wav" }
         ]
+    },
+    {
+        id: "category-filler",
+        name: "繋ぎ",
+        en_name: "Filler",
+        folder: "04_filler",
+        voices:
+        [
+            { text: "そうじゃない", file: "denial1.wav" },
+            { text: "だめ！", file: "denial2.wav" },
+            { text: "それは違う", file: "denial3.wav" }
+        ]
+    },
+    {
+        id: "category-joy",
+        name: "喜び",
+        en_name: "Joy",
+        folder: "05_joy",
+        voices:
+        [
+            { text: "ｙｒｓｔい", file: "denial1.wav" },
+            { text: "だめ！", file: "denial2.wav" },
+            { text: "それは違う", file: "denial3.wav" }
+        ]
+    },
+    {
+        id: "category-anger",
+        name: "怒り",
+        en_name: "Anger",
+        folder: "06_anger",
+        voices:
+        [
+            { text: "あああ", file: "denial1.wav" },
+            { text: "だめ！", file: "denial2.wav" },
+            { text: "それは違う", file: "denial3.wav" }
+        ]
+    },
+    {
+        id: "category-sad",
+        name: "哀しい",
+        en_name: "Sad",
+        folder: "07_sad",
+        voices:
+        [
+            { text: "あああ", file: "denial1.wav" },
+            { text: "だめ！", file: "denial2.wav" },
+            { text: "それは違う", file: "denial3.wav" }
+        ]
+    },
+    {
+        id: "category-happy",
+        name: "楽しい",
+        en_name: "Happy",
+        folder: "08_happy",
+        voices:
+        [
+            { text: "あああ", file: "denial1.wav" },
+            { text: "だめ！", file: "denial2.wav" },
+            { text: "それは違う", file: "denial3.wav" }
+        ]
+    },
+    {
+        id: "category-thank",
+        name: "感謝",
+        en_name: "Thank",
+        folder: "09_thank",
+        voices:
+        [
+            { text: "あああ", file: "denial1.wav" },
+            { text: "だめ！", file: "denial2.wav" },
+            { text: "それは違う", file: "denial3.wav" }
+        ]
+    },
+    {
+        id: "category-sorry",
+        name: "謝罪",
+        en_name: "Sorry",
+        folder: "10_sorry",
+        voices:
+        [
+            { text: "あああ", file: "denial1.wav" },
+            { text: "だめ！", file: "denial2.wav" },
+            { text: "それは違う", file: "denial3.wav" }
+        ]
+    },
+    {
+        id: "category-onomatopoeia",
+        name: "擬音",
+        en_name: "Onomatopoeia",
+        folder: "11_onomatopoeia",
+        voices:
+        [
+            { text: "あああ", file: "denial1.wav" },
+            { text: "だめ！", file: "denial2.wav" },
+            { text: "それは違う", file: "denial3.wav" }
+        ]
+    },
+    {
+        id: "category-other",
+        name: "その他",
+        en_name: "Other",
+        folder: "12_other",
+        voices:
+        [
+            { text: "あああ", file: "denial1.wav" },
+            { text: "だめ！", file: "denial2.wav" },
+            { text: "それは違う", file: "denial3.wav" }
+        ]
     }
 ];
 
