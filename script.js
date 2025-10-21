@@ -11,8 +11,8 @@ const VOICE_DATA =
         folder: "01_greeting",
         voices:
         [
-            { text: "おはよう", file: "baka1.wav" },
-            { text: "こんにちは", file: "baka2.wav" }
+            { text: "こんなみり～", file: "こんなみり～.mp3" },
+            { text: "おつなみり", file: "おつなみり.mp3" }
         ]
     },
     {
@@ -829,4 +829,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 初期化時に全てのボタンの星の状態を同期
     updateAllVoiceButtonStates();
+
 });
