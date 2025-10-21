@@ -5,7 +5,7 @@
 /* GIF画像 */
 .logo-gif
 {
-    width: 400px; /* モバイルでのデフォルトサイズ */
+    width: auto; /* モバイルでのデフォルトサイズ */
     height: auto;
     object-fit: contain;
     vertical-align: middle;
@@ -174,3 +174,4 @@
     color: #ffffff;
 
 }
+
