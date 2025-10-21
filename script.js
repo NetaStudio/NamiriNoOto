@@ -160,6 +160,136 @@ let draggedItem = null;
 // ドロップ位置情報を記憶するフラグ（今回は常に「前」に挿入するため、このフラグは視覚フィードバックの判定にのみ使用する）
 let isDroppingAfterTarget = false;
 
+
+function handleDragStart(e) {
+    draggedItem = this; // ドラッグされている要素を保持
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', this.dataset.voiceId);
+    
+    // ドラッグ要素に半透明と影を適用
+    this.classList.add('opacity-40', 'shadow-2xl');
+}
+
+function handleDragEnd(e) {
+    this.classList.remove('opacity-40', 'shadow-2xl');
+    // ドラッグオーバーのハイライトを全て除去
+    document.querySelectorAll('.voice-button').forEach(item => {
+        item.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+    draggedItem = null;
+}
+
+function handleDragOver(e) {
+    e.preventDefault(); // これが重要！ドロップを許可するために必要。
+
+    const targetItem = e.target.closest('.voice-button');
+    if (targetItem && targetItem !== draggedItem) {
+        // ドロップターゲットがボタンの場合、カーソル位置による上下判定はここでは行わない
+        // ロジックはシンプルに、ターゲット全体にドロップとして扱う
+    }
+}
+
+/**
+ * ドラッグ要素がドロップターゲットから離れたときの処理
+ * @param {Event} e
+ */
+ function handleDragLeave(e) {
+    // 離れた要素からクラスを削除
+    const item = e.target.closest('.voice-button');
+    if (item) {
+        item.classList.remove('drag-over-top', 'drag-over-bottom');
+    }
+}
+
+
+
+/**
+ * ドラッグ要素がドロップされたときの処理
+ * (配列の順序を変更し、UIを再描画する)
+ * @param {Event} e
+ */
+ function handleDrop(e) {
+    e.stopPropagation(); // ブラウザデフォルトの処理を止める
+
+    // ドラッグオーバーのハイライトをリセット
+    document.querySelectorAll('.voice-button').forEach(item => {
+        item.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+    
+    // ドロップされたターゲット要素（voice-button要素全体）を取得
+    const targetItem = e.target.closest('.voice-button');
+    
+    // 状態をリセットする関数 (処理失敗時にも呼び出すため)
+    const resetDragState = () => {
+        if (draggedItem) {
+            draggedItem.classList.remove('opacity-40', 'shadow-2xl'); 
+        }
+        draggedItem = null;
+    };
+
+    if (!draggedItem) {
+        console.warn("[DEBUG] Drop skipped: draggedItem is null.");
+        return;
+    }
+
+    if (!targetItem || draggedItem === targetItem) {
+        console.warn("[DEBUG] Drop skipped: Invalid target or self-drop.");
+        resetDragState();
+        return;
+    }
+    
+    // IDを正しく取得
+    const voiceIdToMove = draggedItem.getAttribute('data-sound');
+    const targetVoiceId = targetItem.getAttribute('data-sound');
+    
+    const oldIndex = favorites.indexOf(voiceIdToMove);
+    const newIndex = favorites.indexOf(targetVoiceId);
+
+    if (oldIndex === -1 || newIndex === -1) {
+        console.error(`Drag/Drop failed: Voice ID not found in favorites array. Drag ID: ${voiceIdToMove}, Target ID: ${targetVoiceId}`);
+        resetDragState();
+        return; 
+    }
+
+    // ------------------------------------------------------------------
+    // ★★★★ 【最終修正ロジック】: ターゲットの直後に挿入
+    // ------------------------------------------------------------------
+    
+    // 1. 移動元要素を配列から取り出す（削除）
+    const movedItem = favorites.splice(oldIndex, 1)[0];
+    
+    // 2. 挿入するインデックスを計算する
+    let insertionIndex;
+
+    if (oldIndex < newIndex) {
+        // 例: 1を3へ移動 (2314)。
+        // 1を削除すると3のインデックスは 2-1=1 となる。元の3の位置 (newIndex=2) に挿入すればOK。
+        insertionIndex = newIndex; 
+    } else {
+        // 例: 3を1へ移動 (3124)。
+        // 3を削除しても1のインデックスは 0 のまま。1の直後(インデックス1)に挿入したい。
+        // ★修正★: ターゲットのインデックス newIndex の位置に挿入する。
+        // splice(newIndex, 0, movedItem)とすると、movedItemはnewIndexの要素の前に挿入される。
+        // ターゲット(1)の前に挿入し、ターゲットを後ろにずらすことで、「ターゲットの直後」を実現する。
+        // favorites.splice(0, 0, 3) -> [3, 1, 2, 4] となる。
+        insertionIndex = newIndex; 
+    }
+    
+    // 3. 新しい位置に要素を挿入
+    favorites.splice(insertionIndex, 0, movedItem);
+
+    // 4. UIを再レンダリング
+    updateFavoriteCategory(); 
+    showCategory('category-favorites'); 
+
+    // 5. ローカルストレージに保存
+    saveFavoritesToLocalStorage();
+
+    // 6. 状態をリセット
+    resetDragState();
+}
+
+
 /**
  * ローカルストレージからメモデータを読み込む
  */
@@ -430,7 +560,7 @@ function createFavoriteCategorySection(favoriteVoices) {
         // メモが一つもない場合のメッセージ
         const message = document.createElement('p');
         message.className = 'text-gray-500 mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200';
-        message.textContent = 'ボイスがメモされていません';
+        message.textContent = 'ボイスがメモされてません';
         section.appendChild(message);
     }
     else
@@ -546,7 +676,7 @@ function generateAppStructure(data) {
  * ドラッグ&ドロップイベントリスナーを設定
  * @param {HTMLElement} grid - メモボタンを含むコンテナ (favorites-grid)
  */
-function setupDragAndDrop(grid) {
+ function setupDragAndDrop(grid) {
     if (!grid) return;
 
     // --- Drag Start ---
@@ -554,28 +684,30 @@ function setupDragAndDrop(grid) {
         const target = e.target.closest('.voice-button');
         if (target) {
             draggedItem = target;
-            // Safari/Firefoxでghostイメージをクリア
             e.dataTransfer.effectAllowed = 'move';
-            // Chromeの挙動を安定させるため、ダミーデータをセット
-            e.dataTransfer.setData('text/plain', target.getAttribute('data-sound'));
-            setTimeout(() => target.classList.add('opacity-40'), 0); // 遅延させて半透明化
+            
+            // data-sound属性からIDを正しく取得してセット
+            e.dataTransfer.setData('text/plain', target.getAttribute('data-sound')); 
+            
+            // 半透明化と影の追加
+            setTimeout(() => target.classList.add('opacity-40', 'shadow-2xl'), 0); 
         }
     });
 
     // --- Drag End ---
     grid.addEventListener('dragend', (e) => {
         if (draggedItem) {
-            draggedItem.classList.remove('opacity-40');
-            draggedItem = null;
+            // opacity-40とshadow-2xlの両方をリセット
+            draggedItem.classList.remove('opacity-40', 'shadow-2xl');
         }
         // ホバーエフェクトのリセット
-        // ★修正★ drag-over-bottom も含めてリセット
         grid.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
             el.classList.remove('drag-over-top', 'drag-over-bottom');
         });
+        draggedItem = null; // handleDropでもリセットされるが、念のため
     });
 
-    // --- Drag Over (常に上側に視覚フィードバックを表示するように修正) ---
+    // --- Drag Over (視覚フィードバック) ---
     grid.addEventListener('dragover', (e) => {
         e.preventDefault(); // ドロップを許可するために必要
         if (draggedItem && draggedItem !== e.target.closest('.voice-button')) {
@@ -588,58 +720,27 @@ function setupDragAndDrop(grid) {
             });
 
             if (target) {
-                // ★修正★: 常に上側 (前に挿入) のフィードバックのみを表示
-                target.classList.add('drag-over-top');
+                // ドロップ位置の Y 座標を取得
+                const rect = target.getBoundingClientRect();
+                const targetMiddleY = rect.top + rect.height / 2;
+                
+                // ドロップ時のカーソル位置をフィードバックに反映 (直後/直前)
+                if (e.clientY > targetMiddleY) {
+                    target.classList.add('drag-over-bottom'); // 直後に挿入のフィードバック
+                } else {
+                    target.classList.add('drag-over-top'); // 直前に挿入のフィードバック
+                }
             }
             e.dataTransfer.dropEffect = 'move';
         }
     });
 
-    // --- Drop (常にターゲットの前に挿入するように修正) ---
+    // --- Drop (★最終修正★: DOM操作を削除し、handleDrop 関数に処理を委譲) ---
     grid.addEventListener('drop', (e) => {
         e.preventDefault();
-        const target = e.target.closest('.voice-button');
 
-        if (draggedItem && target && draggedItem !== target) {
-            const draggedId = draggedItem.getAttribute('data-sound');
-            const targetId = target.getAttribute('data-sound');
-
-            // 1. favorites配列の更新 (常にターゲットの前に挿入)
-            const draggedIndex = favorites.indexOf(draggedId);
-            const targetIndex = favorites.indexOf(targetId);
-
-            if (draggedIndex > -1 && targetIndex > -1) {
-                // (a) 配列からドラッグされた要素を削除
-                favorites.splice(draggedIndex, 1);
-                
-                // (b) ターゲット要素の現在のインデックスを取得 (これが挿入位置となる)
-                let newTargetIndex = favorites.indexOf(targetId);
-                
-                // (c) 挿入位置を決定
-                // ★修正★: 常にターゲットのインデックス（すなわちターゲットの前）に挿入
-                const newIndex = newTargetIndex; 
-
-                // (d) 挿入
-                favorites.splice(newIndex, 0, draggedId);
-                
-                // (e) ローカルストレージに保存
-                saveFavoritesToLocalStorage();
-            }
-
-            // 2. DOMの操作 (常にターゲットの前に挿入)
-            // ★修正★: 常にターゲットの前に挿入
-            target.parentNode.insertBefore(draggedItem, target);
-
-
-            // ホバーエフェクトのリセット
-            target.classList.remove('drag-over-top', 'drag-over-bottom');
-        }
-
-        // ドラッグ元の要素の透明度を戻す
-        if (draggedItem) {
-            draggedItem.classList.remove('opacity-40');
-        }
-        draggedItem = null;
+        // 配列操作、DOM再描画、状態リセットは全て handleDrop 内で行います。
+        handleDrop(e); 
     });
 }
 

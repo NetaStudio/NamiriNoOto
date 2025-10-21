@@ -146,18 +146,25 @@
 /* ---------------------------------------------------- */
 
 /* ドロップ位置を示すための縦線は非表示のまま維持 */
-.drag-over-top, .drag-over-bottom
+.drag-over-top, .drag-over-bottom,
+.voice-button.drag-over-top, .voice-button.drag-over-bottom,
+.voice-button[draggable="true"].drag-over-top, .voice-button[draggable="true"].drag-over-bottom
 {
-    position: static;
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
 }
-.drag-over-top::before, .drag-over-bottom::before
+
+.drag-over-top::before, .drag-over-bottom::before, .drag-over-bottom::after
 {
-    content: none;
+    /* 疑似要素を非表示にしてマークが出ないようにする */
+    content: none !important;
+    display: none !important;
 }
-.drag-over-bottom::after
-{
-    content: none;
-}
+
+/* ---------------------------------------------------- */
+/* カテゴリリンクのホバー/選択時のスタイル調整 */
+/* ---------------------------------------------------- */
 
 /* カテゴリナビゲーションのスタイル */
 .category-link.selected
@@ -167,10 +174,6 @@
     border-radius: 0.5rem;
     font-weight: 600;
 }
-
-/* ---------------------------------------------------- */
-/* カテゴリリンクのホバー/選択時のスタイル調整 */
-/* ---------------------------------------------------- */
 
 /* 1. モバイル/デフォルト: 選択状態の要素にhover/activeが発生しても、選択時の色を維持する */
 .category-link.selected:hover,
