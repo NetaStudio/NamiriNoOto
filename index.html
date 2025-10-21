@@ -41,18 +41,21 @@
             overflow-y: auto;
             margin-bottom: 1rem;
         }
+        /* 追加: クリアボタンのスタイル */
+        #clear-favorites-button
+        {
+            margin-top: auto;
+        }
     </style>
 </head>
 <body class="min-h-screen p-4 sm:p-8">
     <div id="app" class="max-w-7xl mx-auto bg-white shadow-xl rounded-3xl p-0 flex flex-col">
-
         <!-- ヘッダーエリア: GIF画像と説明文を配置 -->
         <header class="px-4 py-2 sm:px-6 sm:py-3 border-b border-gray-200">
             <!-- 画像とテキストを横並び、左揃えで配置 -->
             <div class="flex justify-start items-center space-x-4">
 
                 <!-- GIF画像 (左側) -->
-                <!-- パスを logo.gif に戻します -->
                 <img
                     src="images\logo.gif"
                     alt="Library"
@@ -65,10 +68,10 @@
                         <!-- 改行のデモとして<br>タグを使用 -->
                         本ページはVTuber"汐空なみり"ちゃんの二次創作です<br>
                         (メン限、歌枠を除く)配信中のボイスを収録.ᐟ.ᐟ<br>
-
                     </p>
                     <p class="text-gray-500 text-sm">
-                        ☆を押すと"お気に入り"に登録できます。押した順に登録されますが、ドラッグ＆ドロップでも順番を入れ替えられます
+                        ☆を押すと"お気に入り"に登録できます。<br>
+                        押した順に登録されますがＤ＆Ｄで順番を入れ替えられます
                     </p>
                 </div>
 
@@ -85,6 +88,16 @@
                     <nav id="category-nav">
                         <!-- JSがここにカテゴリボタンとお気に入りリンクを自動で挿入します -->
                     </nav>
+
+                    <!-- お気に入りクリアボタン -->
+                    <button
+                        id="clear-favorites-button"
+                        class="w-full text-sm mt-4 px-3 py-2 rounded-lg text-red-700 border border-red-300 bg-red-50 hover:bg-red-100 transition duration-150"
+                        onclick="clearFavorites()"
+                    >
+                        🗑️ お気に入りクリア
+                    </button>
+
                 </div>
             </aside>
 

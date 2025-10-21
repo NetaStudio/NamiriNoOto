@@ -24,132 +24,133 @@
     }
 }
 
-
 /* ---------------------------------------------------- */
 /* 音声ボタン */
 /* ---------------------------------------------------- */
+
+/* ボイスボタン全体: ドラッグ可能要素の操作性向上 */
+.voice-button[draggable="true"]
+{
+    user-select: none; 
+    cursor: grab; 
+}
+/* 掴んでいることを示すカーソル */
+.voice-button[draggable="true"]:active
+{
+    cursor: grabbing; 
+}
+
 
 /* 音声ボタン内のテキストコンテナ */
 .voice-button .text-content
 {
-    /* 修正: 14px (0.875rem) に変更 (元は12px / 0.75rem) */
+    /* フォントサイズを大きく */
     font-size: 0.875rem;
-    /* 太字を解除 (font-boldがTailwindで適用されていた場合の保険) */
+    /* 太字を解除 */
     font-weight: normal;
-    /* 行間を狭くするためにline-heightを追加 */
-    line-height: 1.2;
-    /* 修正: テキストが星アイコンと重ならないように右側にマージンを設定 */
-    /* アイコン (約1.5rem) + rightパディング (1rem) = 約2.5rem のスペースを確保 */
-    margin-right: 2.5rem;
-    /* 非常に長い単語がレイアウトを崩さないように */
-    overflow-wrap: break-word;
-    word-break: break-word;
-    /* テキストの色を白に設定 */
-    color: #ffffff;
+    /* 行間を狭く */
+    line-height: 1.1;
+    /* 右側の余白を追加 */
+    padding-right: 1.5rem;
 
-    /* 修正: テキストを明示的に左揃えにする */
-    text-align: left;
+    /* 2行表示の設定 */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    /* 親要素がflexなので、テキストが長くなっても隣の要素と重ならないよう設定 */
+    min-width: 0;
+
+    /* テキストはドラッグのトリガーにならないようにポインターイベントを無効化 */
+    pointer-events: none;
+    /* ドラッグ時のブラウザのデフォルト挙動を抑制 */
+    user-select: none;
 }
 
-
-/* 音声ボタン */
+/* 通常のボタンデザイン */
 .voice-button
 {
-    width: 100%;
-    height: auto; /* コンテンツに合わせて自動調整 */
-    min-height: 2.5rem; /* 最小高さを設定 */
-    /* 修正: 上下のパディングを調整してボタンをコンパクトに保つ */
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
-    padding-left: 1rem; /* 既存のpx-4 (1rem) を維持 */
-    padding-right: 1rem; /* 既存のpx-4 (1rem) を維持 */
-
-    border-radius: 0.3rem; /* 角の丸み */
-    display: flex;
-    align-items: center;
-    /* 修正: justify-content は flex-start を維持 */
-    justify-content: flex-start;
-    transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, background-color 0.2s;
-    border: none;
-    cursor: pointer;
-    user-select: none;
-
-    /* 初期デザイン（Tailwindと重複しない部分） */
-    border-radius: 1.5rem; /* rounded-3xl */
-    background-image: linear-gradient(135deg, #1c3e7c 0%, #679ad3 100%);
-    box-shadow: 0 1px 2px rgba(25, 60, 110, 0.4), 0 1px 2px rgba(0, 0, 0, 0.1);
-    position: relative; /* アイコンをabsoluteで配置するための基準 */
+    /* 高さをさらに小さく固定 */
+    height: 2.5rem;
+    flex-shrink: 0;
+    
+    /* 元のCSSを維持 */
+    background-color: #3f619e;
+    background-image: linear-gradient(135deg, #304c97 0%, #7fa3cc 100%);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+    position: relative;
 }
 
 /* ボイス名のテキストに白を適用 */
 .voice-button span:first-child
 {
-    color: #ffffff; /* 白を維持 */
+    color: #ffffff;
 }
-
 
 /* お気に入りアイコンの色を調整 */
 .voice-button .favorite-icon
 {
-    color: #f1c40f !important; /* 目立つ黄色 */
+    color: #f1c40f !important;
     transition: color 0.2s;
-    position: absolute; /* ボタンの右端に絶対配置 */
+    position: absolute;
     right: 1rem;
     top: 50%;
     transform: translateY(-50%);
+    pointer-events: auto;
+    /* カーソルをデフォルト（矢印）に戻す */
+    cursor: default; 
 }
 
 /* アイコンが未選択状態のとき */
 .voice-button .favorite-icon.text-gray-300
 {
-    color: #cccccc !important; /* 薄いグレー */
+    color: #cccccc !important;
 }
-
 
 /* カーソルを合わせた時 */
 .voice-button:hover
 {
-    background-image: linear-gradient(135deg, #3f619e 0%, #8cbaed 100%);
+    background-image: linear-gradient(135deg, #435eaa 0%, #8cafd6 100%);
 }
 
 /* ボタンが押されている時 */
 .voice-button:active
 {
-    transform: translateY(2px) scale(0.98); /* 少し沈み込むアニメーション */
-    box-shadow: 0 1px 2px rgba(0, 60, 160, 0.5), 0 0px 1px rgba(0, 0, 0, 0.05);
+    transform: translateY(2px) scale(0.98);
+
 }
 
-/* Gridの調整（モバイルでの見やすさ） */
-@media (max-width: 639px)
+/* ---------------------------------------------------- */
+/* ドラッグ＆ドロップの視覚フィードバック (非表示) */
+/* ---------------------------------------------------- */
+
+/* ドロップ位置を示すための縦線は非表示のまま維持 */
+.drag-over-top, .drag-over-bottom
 {
-    .voice-grid
-    {
-        grid-template-columns: 1fr 1fr; /* スマホでは2列にする */
-    }
+    position: static;
+}
+.drag-over-top::before, .drag-over-bottom::before
+{
+    content: none;
+}
+.drag-over-bottom::after
+{
+    content: none;
 }
 
-/* ---------------------------------------------------- */
-/* カテゴリ */
-/* ---------------------------------------------------- */
+/* カテゴリナビゲーションのスタイル */
 .category-link.selected
 {
-    background-color: #1c3e7c; /* 選択されているカテゴリの色 */
-    color: #ffffff;
-    font-weight: 700;
-}
-
-/* お気に入りリンクが選択されている時 */
-.category-link.selected span
-{
-    color: #ffffff !important;
-}
-
-.category-link:hover
-{
-    background-color: #e2e8f0;
+    background-color: #cae4fa;
+    color: #334c8f;
+    border-radius: 0.5rem;
+    font-weight: 600;
 }
 
 .category-link.selected:hover
 {
-    background-color: #3f619e;
+    background-color: #4362a5; 
+    color: #ffffff;
 }
