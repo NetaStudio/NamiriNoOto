@@ -14,7 +14,12 @@
         body
         {
             font-family: 'Inter', sans-serif;
-            background-color: #f0f4f8;
+            background-image: url('images/background.png'); 
+            background-size: auto; 
+            background-repeat: repeat;
+            background-attachment: fixed; 
+            background-position: center center; 
+
         }
         /* メインコンテンツエリアの高さを調整 */
         #main-content
@@ -52,8 +57,8 @@
     <div id="app" class="max-w-7xl mx-auto bg-white shadow-xl rounded-3xl p-0 flex flex-col">
         <!-- ヘッダーエリア: GIF画像と説明文を配置 -->
         <header class="px-4 py-2 sm:px-6 sm:py-3 border-b border-gray-200">
-            <!-- 画像とテキストを横並び、左揃えで配置 -->
-            <div class="flex justify-start items-center space-x-4">
+            <!-- ★修正: モバイルで縦並び (flex-col) 中央寄せ、PCで横並び (sm:flex-row) 左寄せに変更★ -->
+            <div class="flex flex-col sm:flex-row justify-start sm:justify-start items-start sm:items-center sm:space-x-4">
 
                 <!-- GIF画像 (左側) -->
                 <img
