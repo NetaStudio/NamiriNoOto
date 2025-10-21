@@ -430,7 +430,7 @@ function createFavoriteCategorySection(favoriteVoices) {
         // メモが一つもない場合のメッセージ
         const message = document.createElement('p');
         message.className = 'text-gray-500 mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200';
-        message.textContent = 'メモのボイスはまだ登録されていません。☆マークを押して登録できます。';
+        message.textContent = 'ボイスがメモされていません';
         section.appendChild(message);
     }
     else
