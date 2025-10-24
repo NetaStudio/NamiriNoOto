@@ -4,6 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>汐空なみりノート</title>
+
+    /* Xでリンクを貼ったときの表示 */
+    <meta property="og:url" content="https://netastudio.github.io/NamiriNoOto/">
+    <meta property="og:title" content="汐空なみりノート">
+    <meta property="og:description" content="VTuber『汐空なみり』ちゃんの配信中のボイスを収録">
+    <meta property="og:site_name" content="汐空なみりノート">
+    <meta property="og:image" content="https://github.com/NetaStudio/NamiriNoOto/blob/main/images/logo.gif">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="@Neta_Studio">
+    <meta name="twitter:image" content="https://github.com/NetaStudio/NamiriNoOto/blob/main/images/logo.gif">
+
     <!-- Tailwind CSSを読み込み (デザインを整えるため) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="style.css">
@@ -14,11 +25,11 @@
         body
         {
             font-family: 'Inter', sans-serif;
-            background-image: url('images/background.png'); 
-            background-size: auto; 
+            background-image: url('images/background.png');
+            background-size: auto;
             background-repeat: repeat;
-            background-attachment: fixed; 
-            background-position: center center; 
+            background-attachment: fixed;
+            background-position: center center;
 
         }
         /* メインコンテンツエリアの高さを調整 */
@@ -30,10 +41,9 @@
         /* 画面全体に対するアプリコンテナの調整 */
         #app
         {
-            /* ヘッダーの高さ(約72px)を考慮してvhから引く */
             height: calc(100vh - 4rem);
         }
-        /* サイドバーの高さを調整 (ボタン領域を確保) */
+        /* サイドバーの高さを調整 */
         #sidebar-inner
         {
             display: flex;
@@ -46,7 +56,7 @@
             overflow-y: auto;
             margin-bottom: 1rem;
         }
-        /* 追加: クリアボタンのスタイル */
+        /* クリアボタンのスタイル */
         #clear-favorites-button
         {
             margin-top: auto;
@@ -57,7 +67,7 @@
     <div id="app" class="max-w-7xl mx-auto bg-white shadow-xl rounded-3xl p-0 flex flex-col">
         <!-- ヘッダーエリア: GIF画像と説明文を配置 -->
         <header class="px-4 py-2 sm:px-6 sm:py-3 border-b border-gray-200">
-            <!-- ★修正: モバイルで縦並び (flex-col) 中央寄せ、PCで横並び (sm:flex-row) 左寄せに変更★ -->
+            <!-- モバイルで縦並び中央寄せ、PCで横並び左寄せ -->
             <div class="flex flex-col sm:flex-row justify-start sm:justify-start items-start sm:items-center sm:space-x-4">
 
                 <!-- GIF画像 (左側) -->
@@ -83,15 +93,14 @@
             </div>
         </header>
 
-        <!-- メインコンテンツエリア (2カラムレイアウト) -->
+        <!-- メインコンテンツエリア -->
         <div class="flex flex-grow overflow-hidden">
-
             <!-- 左側: カテゴリサイドバー -->
             <aside id="sidebar" class="w-1/4 min-w-[150px] max-w-[250px] border-r border-gray-200 p-4 overflow-y-auto">
                 <div id="sidebar-inner">
                     <h3 class="font-bold text-gray-700 mb-2 border-b pb-1">カテゴリ一覧</h3>
                     <nav id="category-nav">
-                        <!-- JSがここにカテゴリボタンとメモリンクを自動で挿入します -->
+                        <!-- jsがここにカテゴリボタンとメモリンクを自動挿入 -->
                     </nav>
 
                     <!-- メモクリアボタン -->
@@ -102,13 +111,12 @@
                     >
                         🗑️ メモ削除
                     </button>
-
                 </div>
             </aside>
 
             <!-- 右側: コンテンツ表示エリア -->
             <main id="main-content" class="w-3/4 p-6 overflow-y-auto">
-                <!-- カテゴリセクションは script.js により #main-content の直下に挿入されます -->
+                <!-- カテゴリセクションは script.js により #main-content の直下に挿入 -->
             </main>
         </div>
 
