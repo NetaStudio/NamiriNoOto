@@ -12,15 +12,20 @@ const VOICE_DATA =
         voices:
         [
             { text: "汐空なみりです", file: "汐空なみりです.mp3" },
-            { text: "こんなみり～", file: "こんなみり～.mp3" },
+            { text: "こんなみり～(元気)", file: "こんなみり～(元気).mp3" },
+            { text: "こんなみり～(癒し)", file: "こんなみり～(癒し).mp3" },
             { text: "おつなみり～", file: "おつなみり～.mp3" },
             { text: "おつなみり！", file: "おつなみり！.mp3" },
             { text: "聞こえますか～？", file: "聞こえますか～？.mp3" },
+            { text: "聞こえてるかなぁ", file: "聞こえてるかなぁ.mp3" },
+            { text: "聞こえてそうだね", file: "聞こえてそうだね.mp3" },
             { text: "ただいま", file: "ただいま.mp3" },
             { text: "またね～", file: "またね～.mp3" },
             { text: "またね", file: "またね.mp3" },
             { text: "また！", file: "また！.mp3" },
             { text: "おやすみ～", file: "おやすみ～.mp3" },
+            { text: "君のハート", file: "君のハート.mp3" },
+            { text: "びしょぬれ注意だよ？", file: "びしょぬれ注意だよ？.mp3" },
             { text: "誕生日は1月26日", file: "誕生日は1月26日.mp3" },
             { text: "身長は153cmです", file: "身長は153cmです.mp3" },
             { text: "大きいケーキに飛び込みたい", file: "大きいケーキに飛び込みたい.mp3" }
@@ -36,7 +41,8 @@ const VOICE_DATA =
             { text: "はーい", file: "はーい.mp3" },
             { text: "はい", file: "はい.mp3" },
             { text: "ん", file: "ん.mp3" },
-            { text: "へい", file: "へい.mp3" }
+            { text: "へい", file: "へい.mp3" },
+            { text: "いいよ特別ね", file: "いいよ特別ね.mp3" }
         ]
     },
     {
@@ -46,7 +52,13 @@ const VOICE_DATA =
         folder: "03_negative",
         voices:
         [
+            { text: "ダメ", file: "ダメ.mp3" },
+            { text: "してな～い", file: "してな～い.mp3" },
+            { text: "気持ち悪いんだから", file: "気持ち悪いんだから.mp3" },
             { text: "きめー", file: "きめー.mp3" },
+            { text: "何考えてんの全く", file: "何考えてんの全く.mp3" },
+            { text: "何してんだ！", file: "何してんだ！.mp3" },
+            { text: "許しません", file: "許しません.mp3" },
             { text: "やんないよ", file: "やんないよ.mp3" }
         ]
     },
@@ -57,6 +69,8 @@ const VOICE_DATA =
         folder: "04_filler",
         voices:
         [
+            { text: "あの→", file: "あの→.mp3" },
+            { text: "あの↓", file: "あの↓.mp3" },
             { text: "え～と", file: "え～と.mp3" },
             { text: "てことで", file: "てことで.mp3" },
             { text: "てことでぇ", file: "てことでぇ.mp3" },
@@ -88,11 +102,14 @@ const VOICE_DATA =
         [
             { text: "ふん", file: "ふん.mp3" },
             { text: "まったく", file: "まったく.mp3" },
-            { text: "何してんだ！", file: "何してんだ！.mp3" },
-            { text: "何でそんな虐めるわけ", file: "何でそんな虐めるわけ.mp3" },
             { text: "不機嫌になってきたなぁ", file: "不機嫌になってきたなぁ.mp3" },
+            { text: "黙れ", file: "黙れ.mp3" },
+            { text: "鎮まれ", file: "鎮まれ.mp3" },
             { text: "静粛に", file: "静粛に.mp3" },
             { text: "あ静かに", file: "あ静かに.mp3" },
+            { text: "静かにしなさい", file: "静かにしなさい.mp3" },
+            { text: "舐めんじゃねーぞ", file: "舐めんじゃねーぞ.mp3" },
+            { text: "ざーーーこ", file: "ざーーーこ.mp3" },
             { text: "知らないんだから", file: "知らないんだから.mp3" }
         ]
     },
@@ -115,6 +132,8 @@ const VOICE_DATA =
         folder: "08_happy",
         voices:
         [
+            { text: "楽しみだなぁ", file: "楽しみだなぁ.mp3" },
+            { text: "わくわくすっぞ", file: "わくわくすっぞ.mp3" },
             { text: "いや～はははは", file: "いや～はははは.mp3" },
             { text: "かはははは", file: "かはははは.mp3" },
             { text: "ふふはは", file: "ふふはは.mp3" }
@@ -128,6 +147,7 @@ const VOICE_DATA =
         voices:
         [
             { text: "ありがとー", file: "ありがとー.mp3" },
+            { text: "Thank you", file: "Thank you.mp3" },
             { text: "本当にありがとうございます", file: "本当にありがとうございます.mp3" }
         ]
     },
@@ -148,6 +168,9 @@ const VOICE_DATA =
         folder: "11_onomatopoeia",
         voices:
         [
+            { text: "まぎまぎ", file: "まぎまぎ.mp3" },
+            { text: "むぎむぎ", file: "むぎむぎ.mp3" },
+            { text: "えっほえっほ", file: "えっほえっほ.mp3" },
             { text: "どかーん", file: "どかーん.mp3" }
         ]
     },
@@ -158,10 +181,15 @@ const VOICE_DATA =
         folder: "12_other",
         voices:
         [
+            { text: "はい、あ～ん？", file: "はい、あ～ん？.mp3" },
+            { text: "ちょと待ってね", file: "ちょと待ってね.mp3" },
+            { text: "起きなさ～い", file: "起きなさ～い.mp3" },
+            { text: "起きろ～", file: "起きろ～.mp3" },
             { text: "可愛いでしょ？", file: "可愛いでしょ？.mp3" },
             { text: "ちょと待ってね", file: "ちょと待ってね.mp3" },
+            { text: "戻らなくちゃ", file: "戻らなくちゃ.mp3" },
             { text: "今のなんか語弊あったかなぁ", file: "今のなんか語弊あったかなぁ.mp3" },
-            { text: "本当に今のは言い間違え", file: "本当に今のは言い間違え.mp3" },
+            { text: "忘れろビーム", file: "忘れろビーム.mp3" },
             { text: "満足かな", file: "満足かな.mp3" }
         ]
     }
@@ -849,5 +877,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateAllVoiceButtonStates();
 
 });
+
 
 
