@@ -247,14 +247,49 @@ const DRAG_DATA_KEY = 'text/plain';
 
 
 // =================================================================
-// 2. 状態管理
+// 2. 状態管理 & AudioContext
 // =================================================================
 
 /**
  * 現在選択中のカテゴリIDを保持する変数
- * 初期値は最初のカテゴリID
  */
 let currentCategoryId = VOICE_DATA[0].id;
+
+/**
+ * @type {AudioContext | null}
+ * Web Audio APIのコンテキスト。モバイルでの低遅延再生に必須。
+ */
+let audioContext = null;
+
+/**
+ * @type {Map<string, AudioBuffer>}
+ * 読み込んだ音声データを保持するキャッシュ (キー: fullPath, 値: AudioBuffer)
+ */
+const audioBufferCache = new Map();
+
+/**
+ * AudioContextを初期化します。ユーザーの最初の操作で呼び出される必要があります。
+ */
+function initAudioContext() {
+    if (!audioContext) {
+        // クロスブラウザ対応
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioContextClass();
+        console.log("[Audio] AudioContext initialized.");
+        // モバイル環境で画面タップ時にサスペンド状態を解除するためのダミー操作
+        if (audioContext.state === 'suspended') {
+            const resume = () => {
+                audioContext.resume().then(() => {
+                    console.log("[Audio] AudioContext resumed successfully.");
+                    document.removeEventListener('touchstart', resume);
+                    document.removeEventListener('mousedown', resume);
+                });
+            };
+            document.addEventListener('touchstart', resume, { once: true });
+            document.addEventListener('mousedown', resume, { once: true });
+        }
+    }
+}
 
 
 // =================================================================
@@ -290,6 +325,7 @@ function saveFavorites(favorites) {
  * @param {string} text - ボイスの表示テキスト
  */
 function toggleFavorite(categoryId, file, text) {
+    initAudioContext(); // 最初の操作でお気に入り登録が行われた場合もContextを初期化
     const favorites = loadFavorites();
     const voiceKey = `${categoryId}:${file}`; // 一意のキー
     const index = favorites.findIndex(f => f.voiceKey === voiceKey);
@@ -321,7 +357,7 @@ function toggleFavorite(categoryId, file, text) {
  * お気に入りボイスリストを完全にクリアします。
  */
 function clearFavorites() {
-    // ユーザーに確認を促すモーダルを表示する代わりに、メッセージを表示
+    initAudioContext(); // 最初の操作でクリアが行われた場合もContextを初期化
     console.log("favorites cleared.");
     localStorage.removeItem(STORAGE_KEY);
 
@@ -334,8 +370,7 @@ function clearFavorites() {
     const mainContent = document.getElementById('main-content');
     if (mainContent) {
         const message = document.createElement('div');
-        // Tailwindクラスを使って以前のシンプルなメッセージを再現
-        message.className = 'absolute top-0 right-0 m-4 p-3 bg-red-100 text-red-700 rounded-lg shadow-lg';
+        message.className = 'absolute top-0 right-0 m-4 p-3 bg-red-100 text-red-700 rounded-lg shadow-lg z-50';
         message.textContent = '🗑️ メモがすべて削除されました。';
         mainContent.appendChild(message);
         setTimeout(() => message.remove(), 3000);
@@ -367,17 +402,20 @@ function renderContent(categoryId) {
 
     let voices = [];
     let categoryName = '';
+    let categoryFolder = '';
 
     if (categoryId === FAVORITES_ID) {
         // メモ/お気に入り
         voices = loadFavorites();
         categoryName = 'お気に入り (メモ)';
+        // メモではフォルダは固定されない
     } else {
         // 通常のカテゴリ
         const category = VOICE_DATA.find(c => c.id === categoryId);
         if (!category) return;
         voices = category.voices;
         categoryName = category.name;
+        categoryFolder = category.folder;
     }
 
     // 1. タイトル描画
@@ -391,7 +429,6 @@ function renderContent(categoryId) {
 
     // 2. ボイスボタンのコンテナ描画
     const container = document.createElement('div');
-    // 元のグリッドクラスを復元 (grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4)
     container.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4';
 
     if (categoryId === FAVORITES_ID) {
@@ -404,7 +441,7 @@ function renderContent(categoryId) {
 
     mainContent.appendChild(container);
 
-    // 3. ボイスボタンの描画
+    // 3. ボイスボタンの描画と音声のプリロード（メモ以外の場合）
     if (voices.length === 0) {
         container.innerHTML = `
             <p class="text-gray-500 col-span-full py-8 text-center">
@@ -412,6 +449,14 @@ function renderContent(categoryId) {
             </p>
         `;
     } else {
+        // 🚨 修正: カテゴリ表示時、非同期で音声をキャッシュにロード
+        if (categoryId !== FAVORITES_ID) {
+            voices.forEach(voice => {
+                const fullPath = `sounds/${categoryFolder}/${voice.file}`;
+                loadAudioBuffer(fullPath);
+            });
+        }
+
         voices.forEach(voice => {
             // カテゴリIDがメモではない場合は、元のカテゴリIDを使用
             const originalCategoryId = categoryId === FAVORITES_ID ? voice.categoryId : categoryId;
@@ -435,16 +480,21 @@ function renderContent(categoryId) {
  * @returns {HTMLElement} 生成されたボタン要素
  */
 function createVoiceButton(voice, originalCategoryId) {
-    // === ここが前の正しいUIロジックです。この構造を復元し、UIクラスは変更しません ===
     const isFavorite = loadFavorites().some(f => f.voiceKey === `${originalCategoryId}:${voice.file}`);
     const voiceKey = `${originalCategoryId}:${voice.file}`;
     const folder = voice.folder || VOICE_DATA.find(c => c.id === originalCategoryId).folder;
     const voiceText = voice.text;
 
     const button = document.createElement('div');
-    // style.css に定義された `.voice-button` クラスを使用し、UIをCSSに委ねます
-    button.className = 'voice-button';
-    button.onclick = () => playVoice(folder, voice.file);
+    // 💡 UI修正の維持: 'voice-button' (カスタムCSS) に加えて、横並び配置のためのTailwindクラスを追加
+    button.className = 'voice-button flex justify-between items-center';
+
+    // 🚨 修正: 音声再生関数をWeb Audio APIベースのものに変更
+    button.onclick = () => {
+        initAudioContext(); // クリック時にContextが確実に起動していることを確認
+        playAudioBuffer(folder, voice.file);
+    };
+
     button.dataset.voiceKey = voiceKey;
     button.dataset.categoryId = originalCategoryId;
     button.dataset.file = voice.file;
@@ -458,12 +508,12 @@ function createVoiceButton(voice, originalCategoryId) {
     }
 
 
-    // 星アイコンのSVG要素を生成 (Tailwindクラスを直接使用し、style.cssと連携)
+    // 星アイコンのSVG要素を生成
     const starIcon = isFavorite ?
         `<svg class="star-icon fill-current text-yellow-500" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>` :
         `<svg class="star-icon fill-current text-gray-400" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
 
-    // ボタンのHTML構造を再構築 (前回の失敗で壊れた要素を修復)
+    // ボタンのHTML構造を再構築 (テキストとボタンが適切に配置されるように)
     button.innerHTML = `
         <span class="voice-text">${voiceText}</span>
         <button
@@ -483,7 +533,6 @@ function createVoiceButton(voice, originalCategoryId) {
     }
 
     return button;
-    // =========================================================================
 }
 
 /**
@@ -495,7 +544,6 @@ function renderSidebar() {
 
     // カテゴリのリンクを生成
     VOICE_DATA.forEach(category => {
-        // 元のデザインのクラスを維持
         const linkHtml = `
             <a
                 href="#"
@@ -510,7 +558,6 @@ function renderSidebar() {
     });
 
     // お気に入り(メモ)のリンクを生成
-    // 元のデザインのクラスを維持
     const favoritesLinkHtml = `
         <a
             href="#"
@@ -688,47 +735,95 @@ function handleDrop(e) {
 
 
 // =================================================================
-// 6. 音声再生ロジック
+// 6. 音声再生ロジック (Web Audio API / キャッシュベース)
 // =================================================================
 
 /**
- * ボイスを再生します。
- * @param {string} folderName - ボイスファイルが格納されているフォルダ名 (例: '01_greeting')
- * @param {string} fileName - ボイスファイル名 (例: '汐空なみりです.mp3')
+ * 音声ファイルをFetchし、ArrayBufferとして返します。
+ * @param {string} url - 音声ファイルのURL
+ * @returns {Promise<ArrayBuffer>}
  */
-function playVoice(folderName, fileName) {
-    const soundPath = `${folderName}/${fileName}`;
-    const fullPath = 'sounds/' + soundPath;
-
-    playAudioWithRetry(fullPath);
+async function fetchAudio(url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch audio: ${response.statusText}`);
+    }
+    return response.arrayBuffer();
 }
 
 /**
- * 指数バックオフ付きのFetch関数 (音声再生)
- * @param {string} url - 再生する音声ファイルのURL
- * @param {number} retries - 残りのリトライ回数
+ * 音声ファイルをロードし、AudioBufferにデコードしてキャッシュします。
+ * @param {string} fullPath - 音声ファイルのフルパス (例: 'sounds/01_greeting/file.mp3')
  */
-async function playAudioWithRetry(url, retries = 3) {
+async function loadAudioBuffer(fullPath) {
+    if (!audioContext) {
+        // AudioContextがまだ初期化されていない場合は処理しない
+        return;
+    }
+
+    if (audioBufferCache.has(fullPath)) {
+        // すでにキャッシュされている場合はスキップ
+        return;
+    }
+
     try {
-        const audio = new Audio(url);
-        audio.currentTime = 0;
-        await audio.play();
-        console.log(`[Success] Audio requested: ${url}`);
+        // 1. ファイルを取得
+        const arrayBuffer = await fetchAudio(fullPath);
+
+        // 2. AudioContextでデコード（非同期）
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+        // 3. キャッシュに保存
+        audioBufferCache.set(fullPath, audioBuffer);
+        console.log(`[Cache] Successfully loaded and cached: ${fullPath}`);
 
     } catch (error) {
-        if (error.name === "NotAllowedError" || error.name === "AbortError") {
-            // ユーザー操作が必要な場合 (多くのブラウザの自動再生ポリシー)
-            console.warn(`[Warning] Audio play restricted. Path: ${url}. (User interaction required)`);
-        } else if (retries > 0) {
-            // リトライ処理
-            const delay = Math.pow(2, 3 - retries) * 500;
-            console.warn(`[Retry] Failed to load audio ${url}. Retrying in ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            playAudioWithRetry(url, retries - 1);
-        } else {
-            // 全てのリトライが失敗
-            console.error(`[Error] Failed to load audio after all retries: ${url}`, error);
-        }
+        console.error(`[Error] Failed to load or decode audio: ${fullPath}`, error);
+    }
+}
+
+/**
+ * キャッシュされたAudioBufferを使用して音声を再生します。
+ * @param {string} folderName - ボイスファイルが格納されているフォルダ名
+ * @param {string} fileName - ボイスファイル名
+ */
+function playAudioBuffer(folderName, fileName) {
+    const fullPath = `sounds/${folderName}/${fileName}`;
+
+    if (!audioContext || audioContext.state === 'suspended') {
+        console.warn(`[Warning] AudioContext is not ready or suspended. Cannot play: ${fullPath}`);
+        // 最初の操作でAudioContextが初期化されるように誘導
+        initAudioContext();
+        return;
+    }
+
+    const audioBuffer = audioBufferCache.get(fullPath);
+
+    if (audioBuffer) {
+        // 1. AudioBufferSourceNodeを作成
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+
+        // 2. 接続 (ノードからコンテキストの出力先へ)
+        source.connect(audioContext.destination);
+
+        // 3. 再生 (Web Audio APIは低遅延で即時再生されます)
+        source.start(0); // 0秒目から再生
+        console.log(`[Play] Audio played from cache: ${fullPath}`);
+    } else {
+        console.warn(`[Warning] Audio not yet cached. Attempting to load and play: ${fullPath}`);
+        // キャッシュされていない場合はロードを試みる
+        loadAudioBuffer(fullPath).then(() => {
+            // ロードが完了したら再度再生を試みる (この後のクリックではキャッシュが使われる)
+            const retryBuffer = audioBufferCache.get(fullPath);
+            if (retryBuffer) {
+                const source = audioContext.createBufferSource();
+                source.buffer = retryBuffer;
+                source.connect(audioContext.destination);
+                source.start(0);
+                console.log(`[Play] Audio played after load: ${fullPath}`);
+            }
+        });
     }
 }
 
@@ -738,11 +833,17 @@ async function playAudioWithRetry(url, retries = 3) {
 // =================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Application started.");
-    renderSidebar(); // サイドバーのカテゴリを描画
-    // 初期表示カテゴリを決定 (メモが空でない場合はメモを、そうでなければ最初のカテゴリ)
-    if (loadFavorites().length > 0) {
-        currentCategoryId = FAVORITES_ID;
-    }
-    renderContent(currentCategoryId); // メインコンテンツを描画
+    // 最初のカテゴリを特定
+    const initialCategoryId = VOICE_DATA[0].id;
+
+    // サイドバーの描画
+    renderSidebar();
+
+    // メインコンテンツの描画 (最初のカテゴリ)
+    renderContent(initialCategoryId);
+
+    // 🚨 修正: アプリ起動時（DOMContentLoaded時）にAudioContextを初期化する試みを行う
+    // これにより、ユーザーの最初のクリックまでに準備が進む
+    // （ただし、実際に再生が許可されるのはユーザー操作後であることに注意）
+    initAudioContext();
 });
