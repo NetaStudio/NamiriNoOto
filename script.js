@@ -238,592 +238,418 @@ const VOICE_DATA =
 ];
 
 
-// メモ（お気に入り）カテゴリのID
-const FAVORITES_ID = "category-favorites";
-// ローカルストレージで使用するキー
-const STORAGE_KEY = 'namiri_voice_board_favorites';
-// ドラッグ＆ドロップでデータ転送に使うキー
-const DRAG_DATA_KEY = 'text/plain';
-
-
 // =================================================================
-// 2. 状態管理 & AudioContext
+// 2. グローバル変数 (Web Audio API関連)
 // =================================================================
 
-/**
- * 現在選択中のカテゴリIDを保持する変数
- */
-let currentCategoryId = VOICE_DATA[0].id;
-
-/**
- * @type {AudioContext | null}
- * Web Audio APIのコンテキスト。モバイルでの低遅延再生に必須。
- */
 let audioContext = null;
+// 音声ファイルを一度読み込んだらキャッシュするためのオブジェクト
+const audioCache = {};
+
+// =================================================================
+// 3. ユーティリティ関数
+// =================================================================
 
 /**
- * @type {Map<string, AudioBuffer>}
- * 読み込んだ音声データを保持するキャッシュ (キー: fullPath, 値: AudioBuffer)
+ * Web Audio APIのコンテキストを初期化/再開する
+ * モバイルブラウザでの自動再生制限回避のため、ユーザーの最初の操作時に呼び出す
  */
-const audioBufferCache = new Map();
+function initializeAudioContext() {
+    // 既に初期化済みの場合は何もしない
+    if (audioContext === null) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    // Web Audio APIのコンテキストがサスペンドされている場合、再開を試みる
+    if (audioContext.state === 'suspended') {
+        audioContext.resume().then(() => {
+            console.log('AudioContext resumed successfully.');
+        }).catch(err => {
+            console.error('Failed to resume AudioContext:', err);
+        });
+    }
+
+    // イベントリスナーを一度実行したら削除する
+    document.removeEventListener('click', initializeAudioContext);
+    document.removeEventListener('touchstart', initializeAudioContext);
+}
 
 /**
- * AudioContextを初期化します。ユーザーの最初の操作で呼び出される必要があります。
+ * 指定されたURLの音声をデコードし、AudioBufferを返す (キャッシュ利用)
+ * これにより、毎回ファイルを取得・デコードするコストを削減し、安定性を高めます。
+ * @param {string} url - 音声ファイルのURL
+ * @returns {Promise<AudioBuffer>}
  */
-function initAudioContext() {
-    if (!audioContext) {
-        // クロスブラウザ対応
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        audioContext = new AudioContextClass();
-        console.log("[Audio] AudioContext initialized.");
-        // モバイル環境で画面タップ時にサスペンド状態を解除するためのダミー操作
-        if (audioContext.state === 'suspended') {
-            const resume = () => {
-                audioContext.resume().then(() => {
-                    console.log("[Audio] AudioContext resumed successfully.");
-                    document.removeEventListener('touchstart', resume);
-                    document.removeEventListener('mousedown', resume);
-                });
-            };
-            document.addEventListener('touchstart', resume, { once: true });
-            document.addEventListener('mousedown', resume, { once: true });
+async function loadAudio(url) {
+    if (audioCache[url]) {
+        return audioCache[url];
+    }
+
+    try {
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+        audioCache[url] = audioBuffer;
+        return audioBuffer;
+
+    } catch (error) {
+        console.error(`[Error] Failed to load or decode audio: ${url}`, error);
+        throw error;
+    }
+}
+
+/**
+ * Web Audio APIを使用して音声を再生する (モバイルの頭切れ不具合対応)
+ * @param {string} url - 再生する音声ファイルのURL
+ */
+async function playAudioBuffer(url) {
+    try {
+        // 1. AudioContextの初期化/再開を確実に行う
+        // ※この関数が呼び出される前に、初期化イベントリスナーで一度は実行されているはずだが、念のため状態を確認
+        if (audioContext && audioContext.state === 'suspended') {
+            await audioContext.resume();
+        }
+
+        // 2. 音声データの読み込みとデコード (キャッシュ利用)
+        const buffer = await loadAudio(url);
+
+        // 3. AudioBufferSourceNodeを作成し、再生する
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        source.start(0); // Web Audio APIは正確に0秒から再生を開始
+
+        console.log(`[Success] Audio buffer played: ${url}`);
+
+    } catch (error) {
+        if (error.name === "NotAllowedError" || error.name === "AbortError" || error.message.includes('autoplay')) {
+            console.warn(`[Warning] Audio play restricted. Path: ${url}. (User interaction required)`);
+        } else {
+            console.error(`[Error] Failed to play audio using Web Audio API: ${url}`, error);
         }
     }
 }
 
 
 // =================================================================
-// 3. ローカルストレージ操作 (メモ/お気に入り)
+// 4. メインロジック
 // =================================================================
 
 /**
- * ローカルストレージからお気に入りボイスの配列を取得します。
- * @returns {Array<Object>} お気に入りボイスデータの配列
+ * 音声再生開始 (メインの呼び出し関数)
+ * ※以前の playAudioWithRetry を置き換え
+ * @param {string} soundPath - ボイスのファイルパス (folder/file)
  */
-function loadFavorites() {
-    const json = localStorage.getItem(STORAGE_KEY);
+function playVoice(soundPath) {
+    // AudioContextが未初期化の場合は、警告を出して処理を停止（通常は最初のクリックで初期化される）
+    if (!audioContext) {
+        console.warn('AudioContext not initialized. Please click the screen first.');
+        // 代替として以前のnew Audio()ロジックをフォールバックとして残すことも可能だが、
+        // 根本解決のためWeb Audio APIを推奨
+        const fullPath = 'sounds/' + soundPath;
+        playAudioBuffer(fullPath); // Web Audio APIで再生を試みる
+        return;
+    }
+
+    const fullPath = 'sounds/' + soundPath;
+
+    // Web Audio APIベースの安定した再生関数を呼び出す
+    playAudioBuffer(fullPath);
+}
+
+/**
+ * お気に入りボイス再生
+ * @param {string} path - お気に入りボイスの完全パス (例: 01_greeting/こんぬづわ.mp3)
+ */
+function playFavoriteVoice(path) {
+    playVoice(path);
+}
+
+
+// =================================================================
+// 5. お気に入り (メモ) 機能
+// =================================================================
+
+const FAVORITES_KEY = 'namiri-voice-favorites';
+
+/**
+ * お気に入りボイスリストを取得 (ローカルストレージから)
+ * @returns {Array<Object>}
+ */
+function getFavorites() {
+    const data = localStorage.getItem(FAVORITES_KEY);
     try {
-        return json ? JSON.parse(json) : [];
+        return data ? JSON.parse(data) : [];
     } catch (e) {
-        console.error("Failed to parse favorites from storage:", e);
+        console.error("Failed to parse favorites from localStorage.", e);
         return [];
     }
 }
 
 /**
- * お気に入りボイスの配列をローカルストレージに保存します。
- * @param {Array<Object>} favorites - 保存するお気に入りボイスデータの配列
+ * お気に入りボイスリストを保存 (ローカルストレージへ)
+ * @param {Array<Object>} favorites
  */
 function saveFavorites(favorites) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(favorites));
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
 }
 
 /**
- * 指定されたボイスをメモ/お気に入りに登録します。
- * @param {string} categoryId - ボイスが属するカテゴリID
- * @param {string} file - ボイスのファイル名
- * @param {string} text - ボイスの表示テキスト
+ * 指定されたボイスをお気に入りに追加/削除
+ * @param {string} categoryId - カテゴリID
+ * @param {string} voiceText - ボイスの表示テキスト
+ * @param {string} voiceFile - ボイスのファイル名
+ * @returns {boolean} - true: 追加, false: 削除
  */
-function toggleFavorite(categoryId, file, text) {
-    initAudioContext(); // 最初の操作でお気に入り登録が行われた場合もContextを初期化
-    const favorites = loadFavorites();
-    const voiceKey = `${categoryId}:${file}`; // 一意のキー
-    const index = favorites.findIndex(f => f.voiceKey === voiceKey);
+function toggleFavorite(categoryId, voiceText, voiceFile) {
+    const favorites = getFavorites();
+    const voicePath = `${getCategoryFolder(categoryId)}/${voiceFile}`;
+    const index = favorites.findIndex(fav => fav.path === voicePath);
+    const starIcon = document.querySelector(`#${categoryId} .voice-button[data-file="${voiceFile}"] .favorite-star`);
+    const starIconFav = document.querySelector(`#favorites-list .voice-button[data-file="${voiceFile}"] .favorite-star`); // メモリスト内の星
 
     if (index === -1) {
-        // 未登録の場合は追加
+        // 追加
         favorites.push({
-            voiceKey: voiceKey,
-            categoryId: categoryId,
-            file: file,
-            text: text,
-            folder: VOICE_DATA.find(c => c.id === categoryId).folder // フォルダ情報も保存
+            id: categoryId,
+            text: voiceText,
+            file: voiceFile,
+            path: voicePath
         });
-        console.log(`[Favorite] Added: ${text}`);
+        saveFavorites(favorites);
+        if (starIcon) starIcon.classList.add('is-favorite');
+        renderVoiceButtons(currentCategoryId); // メモリストを更新
+        return true;
     } else {
-        // 登録済みの場合は削除
+        // 削除
         favorites.splice(index, 1);
-        console.log(`[Favorite] Removed: ${text}`);
-    }
+        saveFavorites(favorites);
+        if (starIcon) starIcon.classList.remove('is-favorite');
+        // メモリストから削除された場合は、現在のカテゴリリストも更新が必要
+        if (currentCategoryId === 'favorites') {
+             renderVoiceButtons('favorites');
+        } else {
+             // 削除時にメモリストも更新
+             renderVoiceButtons(currentCategoryId);
+        }
 
-    saveFavorites(favorites);
-    // 現在メモ画面が表示されている場合は再描画
-    if (currentCategoryId === FAVORITES_ID) {
-        renderContent(FAVORITES_ID);
+        // メモリスト内のボタンから削除された場合、カテゴリ内の星もリセット
+        const categoryVoiceButton = document.querySelector(`#${getVoiceContainerId(categoryId)} .voice-button[data-file="${voiceFile}"] .favorite-star`);
+        if (categoryVoiceButton) categoryVoiceButton.classList.remove('is-favorite');
+
+        return false;
     }
 }
 
 /**
- * お気に入りボイスリストを完全にクリアします。
+ * お気に入り（メモ）リストを完全にクリア
  */
 function clearFavorites() {
-    initAudioContext(); // 最初の操作でクリアが行われた場合もContextを初期化
-    console.log("favorites cleared.");
-    localStorage.removeItem(STORAGE_KEY);
-
-    // 現在メモ画面が表示されている場合は再描画して空にする
-    if (currentCategoryId === FAVORITES_ID) {
-        renderContent(FAVORITES_ID);
-    }
-
-    // 削除が完了したことをユーザーに知らせるUIメッセージを一時的に表示
-    const mainContent = document.getElementById('main-content');
-    if (mainContent) {
-        const message = document.createElement('div');
-        message.className = 'absolute top-0 right-0 m-4 p-3 bg-red-100 text-red-700 rounded-lg shadow-lg z-50';
-        message.textContent = '🗑️ メモがすべて削除されました。';
-        mainContent.appendChild(message);
-        setTimeout(() => message.remove(), 3000);
+    if (confirm('本当にメモリスト（お気に入り）を全て削除しますか？')) {
+        localStorage.removeItem(FAVORITES_KEY);
+        // 全ての星アイコンを非選択状態にする
+        document.querySelectorAll('.favorite-star.is-favorite').forEach(star => {
+            star.classList.remove('is-favorite');
+        });
+        // 表示を更新
+        renderVoiceButtons(currentCategoryId);
     }
 }
 
 
 // =================================================================
-// 4. UI描画ロジック
+// 6. DOM操作とイベントハンドリング
 // =================================================================
 
+let currentCategoryId = 'category-greeting'; // 初期表示カテゴリ
+
 /**
- * 指定されたカテゴリIDに基づいてメインコンテンツを描画します。
- * @param {string} categoryId - 描画するカテゴリID
+ * カテゴリのfolder名を返す
+ * @param {string} categoryId - カテゴリID
+ * @returns {string} - folder名
  */
-function renderContent(categoryId) {
+function getCategoryFolder(categoryId) {
+    if (categoryId === 'favorites') return ''; // お気に入りにはフォルダなし
+
+    const category = VOICE_DATA.find(cat => cat.id === categoryId);
+    return category ? category.folder : '';
+}
+
+/**
+ * ボイスコンテナIDを生成
+ * @param {string} categoryId - カテゴリID
+ * @returns {string} - コンテナID
+ */
+function getVoiceContainerId(categoryId) {
+    return `voice-container-${categoryId}`;
+}
+
+/**
+ * カテゴリボタンとメモリンクをサイドバーにセットアップ
+ */
+function setupCategoryButtons() {
+    const nav = document.getElementById('category-nav');
+    nav.innerHTML = '';
+
+    // カテゴリボタンの生成
+    VOICE_DATA.forEach(category => {
+        const button = document.createElement('a');
+        button.href = '#';
+        button.className = `category-link block px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition duration-150`;
+        button.setAttribute('data-category-id', category.id);
+        button.textContent = `${category.name} (${category.en_name})`;
+        button.addEventListener('click', (e) => {
+            e.preventDefault();
+            changeCategory(category.id);
+        });
+        nav.appendChild(button);
+    });
+
+    // メモ (お気に入り) リンクの生成
+    const favLink = document.createElement('a');
+    favLink.href = '#';
+    favLink.id = 'favorites-link';
+    favLink.className = `category-link block px-3 py-2 rounded-lg text-sm font-bold mt-3 border-t pt-3 text-blue-700 hover:bg-blue-50 transition duration-150`;
+    favLink.setAttribute('data-category-id', 'favorites');
+    favLink.innerHTML = `🌟 メモ (お気に入り)`;
+    favLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        changeCategory('favorites');
+    });
+    nav.appendChild(favLink);
+}
+
+/**
+ * カテゴリの切り替え処理
+ * @param {string} categoryId - 切り替えるカテゴリID
+ */
+function changeCategory(categoryId) {
     currentCategoryId = categoryId;
+    const mainContent = document.getElementById('main-content');
+
+    // 選択状態の更新
+    document.querySelectorAll('.category-link').forEach(link => {
+        link.classList.remove('selected');
+        if (link.getAttribute('data-category-id') === categoryId) {
+            link.classList.add('selected');
+        }
+    });
+
+    // コンテンツの描画
+    renderVoiceButtons(categoryId);
+
+    // メモクリアボタンの表示制御
+    const clearButton = document.getElementById('clear-favorites-button');
+    if (categoryId === 'favorites') {
+        clearButton.style.display = 'block';
+    } else {
+        clearButton.style.display = 'none';
+    }
+
+    // ページトップへ戻る
+    mainContent.scrollTop = 0;
+}
+
+
+/**
+ * ボイスボタンを描画
+ * @param {string} categoryId - カテゴリID
+ */
+function renderVoiceButtons(categoryId) {
     const mainContent = document.getElementById('main-content');
     mainContent.innerHTML = ''; // コンテンツをクリア
 
-    // サイドバーの選択状態を更新
-    document.querySelectorAll('.category-link').forEach(link => {
-        link.classList.remove('selected');
-    });
-    const selectedLink = document.getElementById(`link-${categoryId}`);
-    if (selectedLink) {
-        selectedLink.classList.add('selected');
-    }
+    let voicesToRender = [];
+    let title = '';
+    let isFavorites = categoryId === 'favorites';
 
-    let voices = [];
-    let categoryName = '';
-    let categoryFolder = '';
-
-    if (categoryId === FAVORITES_ID) {
-        // メモ/お気に入り
-        voices = loadFavorites();
-        categoryName = 'お気に入り (メモ)';
-        // メモではフォルダは固定されない
+    if (isFavorites) {
+        voicesToRender = getFavorites();
+        title = '🌟 メモ (お気に入り)';
     } else {
-        // 通常のカテゴリ
-        const category = VOICE_DATA.find(c => c.id === categoryId);
-        if (!category) return;
-        voices = category.voices;
-        categoryName = category.name;
-        categoryFolder = category.folder;
+        const category = VOICE_DATA.find(cat => cat.id === categoryId);
+        if (category) {
+            voicesToRender = category.voices.map(voice => ({
+                id: category.id,
+                text: voice.text,
+                file: voice.file,
+                path: `${category.folder}/${voice.file}`
+            }));
+            title = `${category.name} (${category.en_name})`;
+        } else {
+            mainContent.innerHTML = `<h2 class="text-xl font-bold mb-4">エラー</h2><p>カテゴリが見つかりません。</p>`;
+            return;
+        }
     }
 
-    // 1. タイトル描画
-    const titleHtml = `
-        <h2 class="text-3xl font-bold text-gray-800 mb-6 border-b-2 pb-2">
-            ${categoryName}
-            <span class="text-sm font-normal text-gray-500 ml-2">(${voices.length} 件)</span>
-        </h2>
-    `;
-    mainContent.insertAdjacentHTML('beforeend', titleHtml);
+    // タイトル
+    mainContent.innerHTML += `<h2 class="text-2xl font-bold mb-6 text-gray-800 border-b pb-2">${title}</h2>`;
 
-    // 2. ボイスボタンのコンテナ描画
+    if (isFavorites && voicesToRender.length === 0) {
+        mainContent.innerHTML += `<p class="text-gray-500 mt-4 p-4 bg-white rounded-lg shadow-sm">お気に入りのボイスは登録されていません。<br>カテゴリー内のボイスの右にある「☆」を押して登録してください。</p>`;
+        return;
+    }
+
+    // ボイスボタンコンテナ
     const container = document.createElement('div');
-    container.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4';
-
-    if (categoryId === FAVORITES_ID) {
-        // お気に入りの場合はD&Dイベントを設定
-        container.addEventListener('dragover', handleDragOver);
-        container.addEventListener('drop', handleDrop);
-        container.addEventListener('dragleave', handleDragLeave);
-        container.id = 'voice-container'; // D&D用にIDを設定
+    container.id = isFavorites ? 'favorites-list' : getVoiceContainerId(categoryId);
+    container.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4';
+    if (isFavorites) {
+        container.classList.add('draggable-list');
     }
+
+    voicesToRender.forEach(voice => {
+        const isFavorite = getFavorites().some(fav => fav.path === voice.path);
+        const voiceId = isFavorites ? `fav-${voice.path.replace(/[^a-zA-Z0-9]/g, '-')}` : `${voice.id}-${voice.file.replace('.mp3', '')}`;
+
+        const button = document.createElement('button');
+        button.id = voiceId;
+        button.className = `voice-button relative flex flex-col items-center justify-center p-3 sm:p-4 bg-white rounded-xl shadow-lg hover:shadow-xl hover:bg-blue-50 transition duration-200 ease-in-out transform hover:scale-[1.02] active:scale-[0.98] border border-gray-100 active:bg-blue-100`;
+        button.setAttribute('data-category-id', voice.id || categoryId);
+        button.setAttribute('data-text', voice.text);
+        button.setAttribute('data-file', voice.file);
+        button.setAttribute('data-path', voice.path);
+        button.setAttribute('onclick', `playVoice('${voice.path}')`);
+
+        // お気に入りリストの場合はドラッグ可能にする
+        if (isFavorites) {
+            button.setAttribute('draggable', 'true');
+            button.classList.add('draggable');
+            button.addEventListener('dragstart', handleDragStart);
+            button.addEventListener('dragover', handleDragOver);
+            button.addEventListener('drop', handleDrop);
+            button.addEventListener('dragend', handleDragEnd);
+
+            // モバイル向けドラッグ (touchstart/touchmove/touchend) のためのリスナーも追加
+            button.addEventListener('touchstart', handleTouchStart);
+            button.addEventListener('touchmove', handleTouchMove);
+            button.addEventListener('touchend', handleTouchEnd);
+        }
+
+        // 1. ボイステキスト (中央)
+        const textSpan = document.createElement('span');
+        textSpan.className = 'text-center font-medium text-sm sm:text-base text-gray-800 whitespace-normal break-words leading-tight';
+        textSpan.textContent = voice.text;
+
+        // 2. お気に入りスター (右上)
+        const star = document.createElement('span');
+        star.className = `favorite-star absolute top-1 right-1 cursor-pointer text-xl p-1 rounded-full ${isFavorite ? 'text-yellow-400 is-favorite' : 'text-gray-300 hover:text-yellow-300 transition duration-150'}`;
+        star.innerHTML = '★'; // 星アイコン
+        star.setAttribute('onclick', `event.stopPropagation(); toggleFavorite('${voice.id || categoryId}', '${voice.text}', '${voice.file}')`);
+
+
+        // 構成
+        button.appendChild(textSpan);
+        button.appendChild(star);
+        container.appendChild(button);
+    });
 
     mainContent.appendChild(container);
 
-    // 3. ボイスボタンの描画と音声のプリロード（メモ以外の場合）
-    if (voices.length === 0) {
-        container.innerHTML = `
-            <p class="text-gray-500 col-span-full py-8 text-center">
-                ${categoryId === FAVORITES_ID ? 'メモにボイスが登録されていません。<br>カテゴリーからボイスを☆で追加してください。' : 'このカテゴリにはまだボイスがありません。'}
-            </p>
-        `;
-    } else {
-        // 🚨 修正: カテゴリ表示時、非同期で音声をキャッシュにロード
-        if (categoryId !== FAVORITES_ID) {
-            voices.forEach(voice => {
-                const fullPath = `sounds/${categoryFolder}/${voice.file}`;
-                loadAudioBuffer(fullPath);
-            });
-        }
-
-        voices.forEach(voice => {
-            // カテゴリIDがメモではない場合は、元のカテゴリIDを使用
-            const originalCategoryId = categoryId === FAVORITES_ID ? voice.categoryId : categoryId;
-            const button = createVoiceButton(voice, originalCategoryId);
-            container.appendChild(button);
-        });
-    }
-
-    // ドラッグ中の要素がメインコンテンツ外でドロップされた場合に備えて、documentにもリスナーを設定
-    if (categoryId === FAVORITES_ID) {
-        document.addEventListener('dragend', handleDragEnd);
-    } else {
-        document.removeEventListener('dragend', handleDragEnd);
-    }
-}
-
-/**
- * 個別のボイスボタン要素を生成します。
- * @param {Object} voice - ボイスデータオブジェクト
- * @param {string} originalCategoryId - ボイスが属する元のカテゴリID
- * @returns {HTMLElement} 生成されたボタン要素
- */
-function createVoiceButton(voice, originalCategoryId) {
-    const isFavorite = loadFavorites().some(f => f.voiceKey === `${originalCategoryId}:${voice.file}`);
-    const voiceKey = `${originalCategoryId}:${voice.file}`;
-    const folder = voice.folder || VOICE_DATA.find(c => c.id === originalCategoryId).folder;
-    const voiceText = voice.text;
-
-    const button = document.createElement('div');
-    // 💡 UI修正の維持: 'voice-button' (カスタムCSS) に加えて、横並び配置のためのTailwindクラスを追加
-    button.className = 'voice-button flex justify-between items-center';
-
-    // 🚨 修正: 音声再生関数をWeb Audio APIベースのものに変更
-    button.onclick = () => {
-        initAudioContext(); // クリック時にContextが確実に起動していることを確認
-        playAudioBuffer(folder, voice.file);
-    };
-
-    button.dataset.voiceKey = voiceKey;
-    button.dataset.categoryId = originalCategoryId;
-    button.dataset.file = voice.file;
-    button.dataset.text = voiceText;
-    button.dataset.folder = folder;
-
-    // 現在のカテゴリがメモ(FAVORITES_ID)の場合、ドラッグ可能にする
-    if (currentCategoryId === FAVORITES_ID) {
-        button.draggable = true;
-        button.addEventListener('dragstart', handleDragStart);
-    }
-
-
-    // 星アイコンのSVG要素を生成
-    const starIcon = isFavorite ?
-        `<svg class="star-icon fill-current text-yellow-500" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>` :
-        `<svg class="star-icon fill-current text-gray-400" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
-
-    // ボタンのHTML構造を再構築 (テキストとボタンが適切に配置されるように)
-    button.innerHTML = `
-        <span class="voice-text">${voiceText}</span>
-        <button
-            class="favorite-button"
-            onclick="event.stopPropagation(); toggleFavorite('${originalCategoryId}', '${voice.file}', '${voiceText.replace(/'/g, "\\'")}')"
-            aria-label="${isFavorite ? 'メモから削除' : 'メモに追加'}"
-        >
-            ${starIcon}
-        </button>
-    `;
-
-    // D&D用にドロップターゲットのロジックを追加
-    if (currentCategoryId === FAVORITES_ID) {
-        button.addEventListener('dragenter', handleDragEnter);
-        button.addEventListener('dragleave', handleDragLeave);
-        button.addEventListener('dragover', handleDragOverOnButton);
-    }
-
-    return button;
-}
-
-/**
- * サイドバーのナビゲーションを描画します。
- */
-function renderSidebar() {
-    const navContainer = document.getElementById('category-nav');
-    navContainer.innerHTML = '';
-
-    // カテゴリのリンクを生成
-    VOICE_DATA.forEach(category => {
-        const linkHtml = `
-            <a
-                href="#"
-                id="link-${category.id}"
-                class="category-link block p-2 mt-1 text-sm text-gray-700 hover:bg-gray-100 transition duration-100 rounded-lg whitespace-nowrap overflow-hidden text-ellipsis"
-                onclick="event.preventDefault(); renderContent('${category.id}')"
-            >
-                ${category.name}
-            </a>
-        `;
-        navContainer.insertAdjacentHTML('beforeend', linkHtml);
-    });
-
-    // お気に入り(メモ)のリンクを生成
-    const favoritesLinkHtml = `
-        <a
-            href="#"
-            id="link-${FAVORITES_ID}"
-            class="category-link block p-2 mt-3 text-sm font-bold text-blue-700 border-t border-blue-200 hover:bg-blue-50 transition duration-100 rounded-lg whitespace-nowrap overflow-hidden text-ellipsis"
-            onclick="event.preventDefault(); renderContent('${FAVORITES_ID}')"
-        >
-            ⭐ お気に入り (メモ)
-        </a>
-    `;
-    navContainer.insertAdjacentHTML('beforeend', favoritesLinkHtml);
-
-    // 初期カテゴリを選択状態にする
-    const initialLink = document.getElementById(`link-${currentCategoryId}`);
-    if (initialLink) {
-        initialLink.classList.add('selected');
-    }
-}
-
-
-// =================================================================
-// 5. ドラッグ＆ドロップロジック (メモ/お気に入りの並び替え)
-// =================================================================
-
-let draggedEl = null;
-
-/**
- * ドラッグ開始時の処理
- * @param {DragEvent} e
- */
-function handleDragStart(e) {
-    draggedEl = e.currentTarget;
-    draggedEl.classList.add('dragging');
-    // ドラッグするボイスのkeyをセット
-    e.dataTransfer.setData(DRAG_DATA_KEY, draggedEl.dataset.voiceKey);
-    // ドラッグ&ドロップ操作中に要素が移動することを許可する
-    e.dataTransfer.effectAllowed = 'move';
-}
-
-/**
- * ドラッグ終了時の処理 (どこにドロップされても呼ばれる)
- * @param {DragEvent} e
- */
-function handleDragEnd(e) {
-    if (draggedEl) {
-        draggedEl.classList.remove('dragging');
-        draggedEl = null;
-    }
-    // 全てのドロップオーバー状態をリセット
-    document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
-        el.classList.remove('drag-over-top', 'drag-over-bottom');
-    });
-}
-
-/**
- * ドロップターゲット上でのドラッグオーバー処理 (コンテナ)
- * @param {DragEvent} e
- */
-function handleDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    // ボイスボタン要素以外のドロップオーバー状態をリセット
-    document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
-        if (!el.classList.contains('voice-button')) {
-            el.classList.remove('drag-over-top', 'drag-over-bottom');
-        }
-    });
-}
-
-/**
- * ドロップターゲット上でのドラッグオーバー処理 (ボタン)
- * @param {DragEvent} e
- */
-function handleDragOverOnButton(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-
-    const targetEl = e.currentTarget;
-    if (targetEl === draggedEl) return;
-
-    // 現在のマウス位置が要素の上半分か下半分かを判定
-    const rect = targetEl.getBoundingClientRect();
-    const isOverTopHalf = e.clientY < rect.top + rect.height / 2;
-
-    // ドロップインジケータのクラスを設定/リセット
-    document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
-        if (el !== targetEl) {
-            el.classList.remove('drag-over-top', 'drag-over-bottom');
-        }
-    });
-
-    if (isOverTopHalf) {
-        targetEl.classList.add('drag-over-top');
-        targetEl.classList.remove('drag-over-bottom');
-    } else {
-        targetEl.classList.add('drag-over-bottom');
-        targetEl.classList.remove('drag-over-top');
-    }
-}
-
-/**
- * ドロップターゲットからドラッグ要素が離れた時の処理
- * @param {DragEvent} e
- */
-function handleDragLeave(e) {
-    // コンテナから離れた場合にのみ、インジケータをリセット
-    if (e.currentTarget.id === 'voice-container') {
-        e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
-    }
-    // ボタンから離れた場合、関連するクラスを削除
-    if (e.currentTarget.classList.contains('voice-button')) {
-        setTimeout(() => {
-            const relatedTarget = document.elementFromPoint(e.clientX, e.clientY);
-            if (!relatedTarget || (!relatedTarget.closest('.voice-button') && relatedTarget.id !== 'voice-container')) {
-                e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
-            }
-        }, 0);
-    }
-}
-
-/**
- * ドロップ時の処理 (コンテナ)
- * @param {DragEvent} e
- */
-function handleDrop(e) {
-    e.preventDefault();
-
-    const container = e.currentTarget;
-    let targetEl = e.target.closest('.voice-button'); // ドロップされた位置のボタン要素
-
-    if (!draggedEl) {
-        container.classList.remove('drag-over-top', 'drag-over-bottom');
-        if (targetEl) targetEl.classList.remove('drag-over-top', 'drag-over-bottom');
-        return;
-    }
-
-    if (draggedEl === targetEl) {
-        container.classList.remove('drag-over-top', 'drag-over-bottom');
-        if (targetEl) targetEl.classList.remove('drag-over-top', 'drag-over-bottom');
-        return;
-    }
-
-    const favorites = loadFavorites();
-    const draggedKey = draggedEl.dataset.voiceKey;
-    const draggedIndex = favorites.findIndex(f => f.voiceKey === draggedKey);
-
-    // ドラッグ対象の要素をリストから削除
-    const [voiceToMove] = favorites.splice(draggedIndex, 1);
-
-    if (targetEl) {
-        // ボタン上にドロップされた場合
-        const targetKey = targetEl.dataset.voiceKey;
-        const targetIndex = favorites.findIndex(f => f.voiceKey === targetKey);
-
-        const isOverTopHalf = targetEl.classList.contains('drag-over-top');
-
-        if (targetIndex !== -1) {
-            // ドロップインジケータに基づいて挿入位置を決定
-            const insertIndex = isOverTopHalf ? targetIndex : targetIndex + 1;
-            favorites.splice(insertIndex, 0, voiceToMove);
-        }
-
-        // クラスをリセット
-        targetEl.classList.remove('drag-over-top', 'drag-over-bottom');
-
-    } else {
-        // コンテナの何もない部分にドロップされた場合 (リストの最後に移動と見なす)
-        favorites.push(voiceToMove);
-    }
-
-    // 更新された配列を保存し、コンテンツを再描画
-    saveFavorites(favorites);
-    renderContent(FAVORITES_ID);
-}
-
-
-// =================================================================
-// 6. 音声再生ロジック (Web Audio API / キャッシュベース)
-// =================================================================
-
-/**
- * 音声ファイルをFetchし、ArrayBufferとして返します。
- * @param {string} url - 音声ファイルのURL
- * @returns {Promise<ArrayBuffer>}
- */
-async function fetchAudio(url) {
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch audio: ${response.statusText}`);
-    }
-    return response.arrayBuffer();
-}
-
-/**
- * 音声ファイルをロードし、AudioBufferにデコードしてキャッシュします。
- * @param {string} fullPath - 音声ファイルのフルパス (例: 'sounds/01_greeting/file.mp3')
- */
-async function loadAudioBuffer(fullPath) {
-    if (!audioContext) {
-        // AudioContextがまだ初期化されていない場合は処理しない
-        return;
-    }
-
-    if (audioBufferCache.has(fullPath)) {
-        // すでにキャッシュされている場合はスキップ
-        return;
-    }
-
-    try {
-        // 1. ファイルを取得
-        const arrayBuffer = await fetchAudio(fullPath);
-
-        // 2. AudioContextでデコード（非同期）
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-        // 3. キャッシュに保存
-        audioBufferCache.set(fullPath, audioBuffer);
-        console.log(`[Cache] Successfully loaded and cached: ${fullPath}`);
-
-    } catch (error) {
-        console.error(`[Error] Failed to load or decode audio: ${fullPath}`, error);
-    }
-}
-
-/**
- * キャッシュされたAudioBufferを使用して音声を再生します。
- * @param {string} folderName - ボイスファイルが格納されているフォルダ名
- * @param {string} fileName - ボイスファイル名
- */
-function playAudioBuffer(folderName, fileName) {
-    const fullPath = `sounds/${folderName}/${fileName}`;
-
-    if (!audioContext || audioContext.state === 'suspended') {
-        console.warn(`[Warning] AudioContext is not ready or suspended. Cannot play: ${fullPath}`);
-        // 最初の操作でAudioContextが初期化されるように誘導
-        initAudioContext();
-        return;
-    }
-
-    const audioBuffer = audioBufferCache.get(fullPath);
-
-    if (audioBuffer) {
-        // 1. AudioBufferSourceNodeを作成
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-
-        // 2. 接続 (ノードからコンテキストの出力先へ)
-        source.connect(audioContext.destination);
-
-        // 3. 再生 (Web Audio APIは低遅延で即時再生されます)
-        source.start(0); // 0秒目から再生
-        console.log(`[Play] Audio played from cache: ${fullPath}`);
-    } else {
-        console.warn(`[Warning] Audio not yet cached. Attempting to load and play: ${fullPath}`);
-        // キャッシュされていない場合はロードを試みる
-        loadAudioBuffer(fullPath).then(() => {
-            // ロードが完了したら再度再生を試みる (この後のクリックではキャッシュが使われる)
-            const retryBuffer = audioBufferCache.get(fullPath);
-            if (retryBuffer) {
-                const source = audioContext.createBufferSource();
-                source.buffer = retryBuffer;
-                source.connect(audioContext.destination);
-                source.start(0);
-                console.log(`[Play] Audio played after load: ${fullPath}`);
-            }
-        });
+    // お気に入りリストが更新されたときに、ドラッグアンドドロップイベントを再設定
+    if (isFavorites) {
+        setupDragAndDrop();
     }
 }
 
@@ -833,18 +659,251 @@ function playAudioBuffer(folderName, fileName) {
 // =================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 最初のカテゴリを特定
-    const initialCategoryId = VOICE_DATA[0].id;
+    // 最初にカテゴリとボイスボタンのセットアップを行う
+    setupCategoryButtons();
+    // 初期カテゴリ（挨拶）を表示
+    changeCategory(currentCategoryId);
 
-    // サイドバーの描画
-    renderSidebar();
-
-    // メインコンテンツの描画 (最初のカテゴリ)
-    renderContent(initialCategoryId);
-
-    // 🚨 修正: アプリ起動時（DOMContentLoaded時）にAudioContextを初期化する試みを行う
-    // これにより、ユーザーの最初のクリックまでに準備が進む
-    // （ただし、実際に再生が許可されるのはユーザー操作後であることに注意）
-    initAudioContext();
+    // モバイルの自動再生ポリシーに対応するため、ユーザーの最初の操作で
+    // AudioContextを初期化/再開するリスナーを設定
+    document.addEventListener('click', initializeAudioContext, { once: true });
+    document.addEventListener('touchstart', initializeAudioContext, { once: true });
 });
 
+// =================================================================
+// 8. ドラッグ＆ドロップ機能 (お気に入り順序変更)
+// =================================================================
+
+let draggedItem = null;
+let touchDragData = {
+    item: null,
+    initialY: 0,
+    currentY: 0,
+    list: null,
+    placeholder: null,
+};
+
+function setupDragAndDrop() {
+    // Drag/DropはrenderVoiceButtons内で各ボタンに追加される
+}
+
+// --- デスクトップ版 Drag/Drop (マウス) ---
+
+function handleDragStart(e) {
+    draggedItem = this;
+    e.dataTransfer.effectAllowed = 'move';
+    // Firefox対策: ダミーデータをセット
+    e.dataTransfer.setData('text/plain', this.getAttribute('data-path'));
+    setTimeout(() => this.classList.add('opacity-40'), 0);
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const target = e.target.closest('.voice-button.draggable');
+    if (target && target !== draggedItem) {
+        const rect = target.getBoundingClientRect();
+        const mouseY = e.clientY;
+
+        // ドロップ位置の判定
+        if (mouseY < rect.top + rect.height / 2) {
+            target.classList.remove('drag-over-bottom');
+            target.classList.add('drag-over-top');
+            target.style.borderTop = '3px solid #3b82f6';
+            target.style.borderBottom = 'none';
+        } else {
+            target.classList.remove('drag-over-top');
+            target.classList.add('drag-over-bottom');
+            target.style.borderBottom = '3px solid #3b82f6';
+            target.style.borderTop = 'none';
+        }
+    }
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    if (!draggedItem) return;
+
+    const target = e.target.closest('.voice-button.draggable');
+    if (!target || target === draggedItem) {
+        // ドロップターゲットがないか、自分自身にドロップした場合は何もしない
+        removeDragOverStyles();
+        return;
+    }
+
+    const favoritesList = document.getElementById('favorites-list');
+    const favorites = getFavorites();
+    const draggedPath = draggedItem.getAttribute('data-path');
+    const targetPath = target.getAttribute('data-path');
+
+    const draggedIndex = favorites.findIndex(fav => fav.path === draggedPath);
+    const targetIndex = favorites.findIndex(fav => fav.path === targetPath);
+
+    if (draggedIndex !== -1 && targetIndex !== -1) {
+        // データの並び替え
+        const [removed] = favorites.splice(draggedIndex, 1);
+        if (target.classList.contains('drag-over-top')) {
+            favorites.splice(targetIndex > draggedIndex ? targetIndex - 1 : targetIndex, 0, removed);
+        } else { // drag-over-bottom
+            favorites.splice(targetIndex > draggedIndex ? targetIndex : targetIndex + 1, 0, removed);
+        }
+        saveFavorites(favorites);
+    }
+
+    removeDragOverStyles();
+    renderVoiceButtons('favorites'); // UIを再描画して最新の状態にする
+}
+
+function handleDragEnd() {
+    if (draggedItem) {
+        draggedItem.classList.remove('opacity-40');
+    }
+    draggedItem = null;
+    removeDragOverStyles();
+}
+
+function removeDragOverStyles() {
+    document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
+        el.classList.remove('drag-over-top', 'drag-over-bottom');
+        el.style.borderTop = '';
+        el.style.borderBottom = '';
+    });
+}
+
+// --- モバイル版 Drag/Drop (タッチ) ---
+
+function handleTouchStart(e) {
+    // 1本指タッチのみを処理
+    if (e.touches.length !== 1) return;
+
+    // お気に入りリスト外の要素ではドラッグは無効
+    if (currentCategoryId !== 'favorites') return;
+
+    touchDragData.item = this;
+    touchDragData.initialY = e.touches[0].clientY;
+    touchDragData.currentY = e.touches[0].clientY;
+    touchDragData.list = document.getElementById('favorites-list');
+
+    // 長押しをエミュレートして、一定時間後にドラッグモードに入る (300ms)
+    this.touchStartTime = Date.now();
+    this.touchTimer = setTimeout(() => {
+        touchDragData.item.classList.add('dragging-touch'); // ドラッグ中のスタイルを適用
+        touchDragData.item.style.position = 'absolute';
+        touchDragData.item.style.zIndex = 1000;
+        touchDragData.item.style.width = touchDragData.item.clientWidth + 'px';
+
+        // プレースホルダーの作成
+        touchDragData.placeholder = document.createElement('div');
+        touchDragData.placeholder.className = 'voice-button placeholder-touch bg-gray-200 rounded-xl transition duration-150';
+        touchDragData.placeholder.style.height = touchDragData.item.clientHeight + 'px';
+        touchDragData.placeholder.style.margin = touchDragData.item.style.margin; // マージンをコピー
+        touchDragData.item.parentNode.insertBefore(touchDragData.placeholder, touchDragData.item);
+
+        // 位置の初期化
+        touchDragData.item.style.top = touchDragData.item.offsetTop + 'px';
+        touchDragData.item.style.left = touchDragData.item.offsetLeft + 'px';
+
+    }, 300); // 300msの長押しでドラッグ開始
+}
+
+function handleTouchMove(e) {
+    if (!touchDragData.item || !touchDragData.placeholder) return;
+
+    // 長押しタイマーをクリア（タップ判定をキャンセル）
+    if (this.touchTimer) {
+        clearTimeout(this.touchTimer);
+        this.touchTimer = null;
+    }
+
+    e.preventDefault(); // スクロール防止
+
+    const touchY = e.touches[0].clientY;
+    const deltaY = touchY - touchDragData.currentY;
+    touchDragData.currentY = touchY;
+
+    // ドラッグ中のアイテムの移動
+    const currentTop = parseFloat(touchDragData.item.style.top || 0);
+    touchDragData.item.style.top = (currentTop + deltaY) + 'px';
+    touchDragData.item.style.transform = `translateY(${deltaY}px)`;
+
+
+    const itemCenterY = touchY;
+
+    // プレースホルダーの位置を更新
+    const children = Array.from(touchDragData.list.children).filter(child => child !== touchDragData.item);
+    let newIndex = children.length;
+
+    for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        const rect = child.getBoundingClientRect();
+        const childCenterY = rect.top + rect.height / 2;
+
+        if (itemCenterY < childCenterY) {
+            newIndex = i;
+            break;
+        }
+    }
+
+    const placeholderParent = touchDragData.placeholder.parentNode;
+    if (placeholderParent) {
+        const currentIndex = Array.from(placeholderParent.children).indexOf(touchDragData.placeholder);
+
+        if (newIndex < currentIndex) {
+            placeholderParent.insertBefore(touchDragData.placeholder, placeholderParent.children[newIndex]);
+        } else if (newIndex > currentIndex) {
+            placeholderParent.insertBefore(touchDragData.placeholder, placeholderParent.children[newIndex].nextSibling);
+        }
+    }
+}
+
+function handleTouchEnd(e) {
+    // 長押しタイマーが残っていた場合、それは単なるタップだったと見なす
+    if (this.touchTimer) {
+        clearTimeout(this.touchTimer);
+        this.touchTimer = null;
+        // AudioContextの初期化がまだなら、このタップで初期化する
+        initializeAudioContext();
+        return; // 単なるタップの場合は、通常のonclickが実行される
+    }
+
+    if (!touchDragData.item || !touchDragData.placeholder) return;
+
+    const favorites = getFavorites();
+    const draggedPath = touchDragData.item.getAttribute('data-path');
+    const draggedIndex = favorites.findIndex(fav => fav.path === draggedPath);
+
+    // プレースホルダーの現在のインデックスを取得
+    const newIndex = Array.from(touchDragData.list.children).indexOf(touchDragData.placeholder);
+
+    if (draggedIndex !== -1) {
+        // データの並び替え
+        const [removed] = favorites.splice(draggedIndex, 1);
+        favorites.splice(newIndex, 0, removed);
+        saveFavorites(favorites);
+    }
+
+    // クリーンアップ
+    touchDragData.item.classList.remove('dragging-touch');
+    touchDragData.item.style.position = '';
+    touchDragData.item.style.zIndex = '';
+    touchDragData.item.style.top = '';
+    touchDragData.item.style.left = '';
+    touchDragData.item.style.width = '';
+    touchDragData.item.style.transform = '';
+
+    touchDragData.placeholder.remove();
+
+    touchDragData = {
+        item: null,
+        initialY: 0,
+        currentY: 0,
+        list: null,
+        placeholder: null,
+    };
+
+    renderVoiceButtons('favorites'); // UIを再描画して最新の状態にする
+}
+
+// ユーザーの最初のクリック/タッチでAudioContextを初期化するように設定
+document.addEventListener('click', initializeAudioContext, { once: true });
+document.addEventListener('touchstart', initializeAudioContext, { once: true });
