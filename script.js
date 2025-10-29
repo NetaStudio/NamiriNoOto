@@ -257,9 +257,13 @@ function loadFavorites() {
             if (!fav.categoryId || !fav.folder) {
                 // フォルダ名とカテゴリIDをVOICE_DATAから探して補完する
                 for (const category of VOICE_DATA) {
-                    if (category.voices.some(v => v.file === fav.file)) {
+                    // ★修正点: 元のデータとファイル名の突き合わせを正確に行う
+                    const foundVoice = category.voices.find(v => v.file === fav.file);
+                    if (foundVoice) {
                         fav.categoryId = category.id;
                         fav.folder = category.folder;
+                        // ファイル名だけでなくテキストも元のVOICE_DATAから補完する
+                        fav.text = foundVoice.text; 
                         break;
                     }
                 }
@@ -461,7 +465,8 @@ function createVoiceButton(voice, folder, categoryId, isFavorite, isDraggable) {
 
     // ボイス名テキスト
     const textSpan = document.createElement('span');
-    textSpan.textContent = voice.text;
+    // ★修正点: voice.textを使用して、元のテキストを正確に表示
+    textSpan.textContent = voice.text; 
     textSpan.className = 'block font-medium truncate pt-1';
 
     button.appendChild(starButton);
@@ -670,18 +675,18 @@ function handleDragEnd(e) {
 }
 
 // =================================================================
-// 6. ボイス再生 (Audioインスタンスの再利用による不具合修正)
+// 6. ボイス再生 (Audioインスタンスの再利用による不具合修正 - Audio Pool)
 // =================================================================
 
-// ★修正点: プリロードされたAudioインスタンスを保持するマップ (Audio Pool)
+// ★ Audio Pool: プリロードされたAudioインスタンスを保持するマップ
 const audioPool = new Map();
 
-// ★修正点: 現在再生中のAudioオブジェクトを保持するグローバル変数 (排他制御用)
+// ★ 排他制御用: 現在再生中のAudioオブジェクトを保持するグローバル変数
 let currentAudio = null;
 
 
 /**
- * ★修正点: 全ての音声ファイルをプリロードし、Audio Poolを構築する
+ * ★ 全ての音声ファイルをプリロードし、Audio Poolを構築する
  */
 function preloadAudioPool() {
     console.log("[Audio] Preloading all voices...");
@@ -718,7 +723,7 @@ function playVoice(button) {
     const soundPath = `${folder}/${file}`;
     const fullPath = 'sounds/' + soundPath;
 
-    // ★修正点: Audio Poolからインスタンスを取得
+    // ★ Audio Poolからインスタンスを取得
     const audioInstance = audioPool.get(fullPath);
 
     if (audioInstance) {
@@ -732,13 +737,12 @@ function playVoice(button) {
 }
 
 /**
- * ★修正点: Audio Poolから取得したインスタンスを再生する (排他制御あり)
+ * ★ Audio Poolから取得したインスタンスを再生する (排他制御あり)
  * @param {HTMLAudioElement} audio - 再生するAudioインスタンス
  * @param {string} url - ログ表示用のURL
  */
 async function playAudioFromPool(audio, url) {
     // 1. 排他制御: 現在再生中の音声を停止
-    // 同じ音を連続で鳴らしたい場合もあるため、currentAudio === audio のチェックは削除しない
     if (currentAudio && currentAudio !== audio) {
         currentAudio.pause();
         currentAudio.currentTime = 0; // リセットしてリソース解放を助ける
@@ -796,7 +800,6 @@ async function playAudioWithRetry(url, retries = 3) {
         }
     }
 }
-
 
 // =================================================================
 // 7. 初期化 (DOMContentLoadedイベントハンドラ)
