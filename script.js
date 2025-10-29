@@ -12,8 +12,8 @@ const VOICE_DATA =
         voices:
         [
             { text: "汐空なみりです", file: "汐空なみりです.mp3" },
-            { text: "こんなみり～(元気)", file: "こんなみり～(元気).mp3" },
-            { text: "こんなみり～(癒し)", file: "こんなみり～(癒し).mp3" },
+            { text: "こんなみり～", file: "こんなみり～.mp3" },
+            { text: "こんなみりー！", file: "こんなみりー！.mp3" },
             { text: "おつなみり～", file: "おつなみり～.mp3" },
             { text: "おつなみり！", file: "おつなみり！.mp3" },
             { text: "聞こえますか～？", file: "聞こえますか～？.mp3" },
@@ -24,11 +24,12 @@ const VOICE_DATA =
             { text: "またね", file: "またね.mp3" },
             { text: "また！", file: "また！.mp3" },
             { text: "おやすみ～", file: "おやすみ～.mp3" },
+            { text: "ばいば～い", file: "ばいば～い.mp3" },
             { text: "君のハート", file: "君のハート.mp3" },
             { text: "びしょぬれ注意だよ？", file: "びしょぬれ注意だよ？.mp3" },
             { text: "誕生日は1月26日", file: "誕生日は1月26日.mp3" },
             { text: "身長は153cmです", file: "身長は153cmです.mp3" },
-            { text: "大きいケーキに飛び込みたい", file: "大きいケーキに飛び込みたい.mp3" }
+            { text: "大きいケーキに飛び込みたい", file: "大きいケーキに飛び込みたい.mp3" },
         ]
     },
     {
@@ -162,23 +163,42 @@ const VOICE_DATA =
         ]
     },
     {
+        id: "category-inciting",
+        name: "煽り",
+        en_name: "Inciting",
+        folder: "11_inciting",
+        voices:
+        [
+            { text: "へ～", file: "へ～.mp3" },
+            { text: "お～い", file: "お～い.mp3" },
+            { text: "ざーーーこ", file: "ざーーーこ.mp3" },
+            { text: "残念でした", file: "残念でした.mp3" },
+            { text: "そんなこともできないの？", file: "そんなこともできないの？.mp3" },
+            { text: "ばーか", file: "ばーか.mp3" },
+            { text: "まぁまぁまぁまぁ", file: "まぁまぁまぁまぁ.mp3" },
+            { text: "良い子だね？", file: "良い子だね？.mp3" },
+        ]
+    },
+    {
         id: "category-onomatopoeia",
         name: "擬音",
         en_name: "Onomatopoeia",
-        folder: "11_onomatopoeia",
+        folder: "12_onomatopoeia",
         voices:
         [
             { text: "まぎまぎ", file: "まぎまぎ.mp3" },
             { text: "むぎむぎ", file: "むぎむぎ.mp3" },
             { text: "えっほえっほ", file: "えっほえっほ.mp3" },
-            { text: "どかーん", file: "どかーん.mp3" }
+            { text: "じーーーー", file: "じーーーー.mp3" },
+            { text: "どかーん", file: "どかーん.mp3" },
+            { text: "わせわせ", file: "わせわせ.mp3" },
         ]
     },
     {
         id: "category-other",
         name: "その他",
         en_name: "Other",
-        folder: "12_other",
+        folder: "13_other",
         voices:
         [
             { text: "はい、あ～ん？", file: "はい、あ～ん？.mp3" },
@@ -877,6 +897,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateAllVoiceButtonStates();
 
 });
+
 
 
 
