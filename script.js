@@ -87,7 +87,7 @@ const VOICE_DATA =
             { text: "もう", file: "もう.mp3" },
             { text: "ん～？", file: "ん～？.mp3" },
             { text: "んしょ～", file: "んしょ～.mp3" },
-            { text: "いや、まぁ本当", file: "いや、まぁ本当.mp3" }
+            { text: "いや、まぁ本当", file: "いや、まぁ本当.mp3" },
         ]
     },
     {
@@ -178,7 +178,7 @@ const VOICE_DATA =
         [
             { text: "すまん", file: "すまん.mp3" },
             { text: "ごめ～んね？", file: "ごめ～んね？.mp3" },
-            { text: "気付いてませんでした ", file: "気付いてませんでした.mp3" },
+            { text: "気付いてませんでした", file: "気付いてませんでした.mp3" },
             { text: "もうえぇでしょ", file: "もうえぇでしょ.mp3" },
         ]
     },
@@ -194,7 +194,6 @@ const VOICE_DATA =
             { text: "そんなこともできないの？", file: "そんなこともできないの？.mp3" },
             { text: "ざーーーこ", file: "ざーーーこ.mp3" },
             { text: "残念でした", file: "残念でした.mp3" },
-            { text: "そんなこともできないの？", file: "そんなこともできないの？.mp3" },
             { text: "ばーか", file: "ばーか.mp3" },
             { text: "まぁまぁまぁまぁ", file: "まぁまぁまぁまぁ.mp3" },
             { text: "良い子だね？", file: "良い子だね？.mp3" },
@@ -237,6 +236,7 @@ const VOICE_DATA =
         ]
     }
 ];
+
 
 // メモ（お気に入り）カテゴリのID
 const FAVORITES_ID = "category-favorites";
@@ -847,3 +847,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // （ただし、実際に再生が許可されるのはユーザー操作後であることに注意）
     initAudioContext();
 });
+
