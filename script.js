@@ -670,7 +670,7 @@ function handleDragEnd(e) {
 }
 
 // =================================================================
-// 6. ボイス再生 (Audioインスタンスの再利用を導入 - 長時間再生問題対策)
+// 6. ボイス再生 (Audioインスタンスの再利用による不具合修正)
 // =================================================================
 
 // ★修正点: プリロードされたAudioインスタンスを保持するマップ (Audio Pool)
@@ -738,6 +738,7 @@ function playVoice(button) {
  */
 async function playAudioFromPool(audio, url) {
     // 1. 排他制御: 現在再生中の音声を停止
+    // 同じ音を連続で鳴らしたい場合もあるため、currentAudio === audio のチェックは削除しない
     if (currentAudio && currentAudio !== audio) {
         currentAudio.pause();
         currentAudio.currentTime = 0; // リセットしてリソース解放を助ける
@@ -770,7 +771,6 @@ async function playAudioFromPool(audio, url) {
     }
 }
 
-
 /**
  * 指数バックオフ付きのAudio新規作成・再生関数 (予備/エラー処理用)
  * @param {string} url - 再生する音声ファイルのURL
@@ -781,7 +781,7 @@ async function playAudioWithRetry(url, retries = 3) {
         const audio = new Audio(url);
         audio.currentTime = 0;
         await audio.play();
-        console.log(`[Success] Audio requested (New Instance): ${url}`);
+        console.log(`[Success] Audio requested (New Instance - Fallback): ${url}`);
 
     } catch (error) {
         if (error.name === "NotAllowedError" || error.name === "AbortError") {
