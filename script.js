@@ -191,6 +191,7 @@ const VOICE_DATA =
         [
             { text: "へ～", file: "へ～.mp3" },
             { text: "お～い", file: "お～い.mp3" },
+            { text: "そんなこともできないの？", file: "そんなこともできないの？.mp3" },
             { text: "ざーーーこ", file: "ざーーーこ.mp3" },
             { text: "残念でした", file: "残念でした.mp3" },
             { text: "そんなこともできないの？", file: "そんなこともできないの？.mp3" },
@@ -221,16 +222,18 @@ const VOICE_DATA =
         folder: "13_other",
         voices:
         [
-            { text: "はい、あ～ん？", file: "はい、あ～ん？.mp3" },
-            { text: "ちょと待ってね", file: "ちょと待ってね.mp3" },
-            { text: "起きなさ～い", file: "起きなさ～い.mp3" },
             { text: "起きろ～", file: "起きろ～.mp3" },
-            { text: "可愛いでしょ？", file: "可愛いでしょ？.mp3" },
+            { text: "起きなさ～い", file: "起きなさ～い.mp3" },
             { text: "ちょと待ってね", file: "ちょと待ってね.mp3" },
+            { text: "一緒にいこ！", file: "一緒にいこ！.mp3" },
             { text: "戻らなくちゃ", file: "戻らなくちゃ.mp3" },
+            { text: "美味しくな～れ", file: "美味しくな～れ.mp3" },
+            { text: "はい、あ～ん？", file: "はい、あ～ん？.mp3" },
+            { text: "可愛いでしょ？", file: "可愛いでしょ？.mp3" },
             { text: "今のなんか語弊あったかなぁ", file: "今のなんか語弊あったかなぁ.mp3" },
+            { text: "何見てんのセクハラ", file: "何見てんのセクハラ.mp3" },
             { text: "忘れろビーム", file: "忘れろビーム.mp3" },
-            { text: "満足かな", file: "満足かな.mp3" }
+            { text: "満足かな", file: "満足かな.mp3" },
         ]
     }
 ];
@@ -917,6 +920,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateAllVoiceButtonStates();
 
 });
+
 
 
 
