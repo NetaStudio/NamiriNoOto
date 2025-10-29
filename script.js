@@ -454,8 +454,11 @@ function createVoiceButton(voice, folder, categoryId, isFavorite, isDraggable) {
     // お気に入りボタン（星）
     const starButton = document.createElement('button');
     starButton.type = 'button';
-    // ★ 修正: 未登録（☆）の状態でも青みがかるよう text-blue-500 を追加
-    starButton.className = 'absolute top-1 right-1 text-lg leading-none p-1 transition duration-150 text-blue-500 hover:text-blue-700';
+    
+    // ★ 修正箇所: お気に入り状態によって色を切り替える (★は青, ☆は灰色)
+    const starColorClass = isFavorite ? 'text-blue-500' : 'text-gray-400'; 
+    starButton.className = `absolute top-1 right-1 text-lg leading-none p-1 transition duration-150 ${starColorClass} hover:text-blue-700`;
+    
     starButton.innerHTML = isFavorite ? '★' : '☆'; // 登録済みなら★、未登録なら☆
     starButton.title = isFavorite ? 'メモから削除' : 'メモに登録';
     starButton.onclick = (e) => {
@@ -550,6 +553,9 @@ function clearFavorites() {
              // text-blue-500はそのまま維持
              starBtn.innerHTML = '☆';
              starBtn.title = 'メモに登録';
+             // 色を強制的に灰色に戻す
+             starBtn.classList.remove('text-blue-500');
+             starBtn.classList.add('text-gray-400');
         });
     };
 }
