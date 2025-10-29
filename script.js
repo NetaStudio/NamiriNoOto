@@ -126,7 +126,7 @@ const VOICE_DATA =
             { text: "ふざけんな", file: "ふざけんな.mp3" },
             { text: "知らないんだから", file: "知らないんだから.mp3" },
             { text: "不機嫌になってきたなぁ", file: "不機嫌になってきたなぁ.mp3" },
-            { text: "そういうこと考えてるんだ", file: "そういうこと考えてるんだ.mp3" },
+            { text: "そういうこと考えてんだ", file: "そういうこと考えてんだ.mp3" },
         ]
     },
     {
@@ -819,3 +819,4 @@ document.addEventListener('DOMContentLoaded', () => {
     
     renderCategoryNav();
 });
+
