@@ -887,6 +887,7 @@ function handleVoiceButtonClick(soundPath) {
 async function playAudioWithRetry(url, retries = 3) {
     try {
         const audio = new Audio(url);
+        await audio.load();
         audio.currentTime = 0;
         await audio.play();
         console.log(`[Success] Audio requested: ${url}`);
@@ -919,3 +920,4 @@ document.addEventListener('DOMContentLoaded', () => {
     updateAllVoiceButtonStates();
 
 });
+
