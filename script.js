@@ -238,631 +238,452 @@ const VOICE_DATA =
     }
 ];
 
+// メモ（お気に入り）カテゴリのID
+const FAVORITES_ID = "category-favorites";
+// ローカルストレージで使用するキー
+const STORAGE_KEY = 'namiri_voice_board_favorites';
+// ドラッグ＆ドロップでデータ転送に使うキー
+const DRAG_DATA_KEY = 'text/plain';
+
+
 // =================================================================
-// 2. メモ機能の管理 (Arrayに変更し、順序を保持)
+// 2. 状態管理
 // =================================================================
 
-const FAVORITES_KEY = 'namiri_oto_favorites';
-let favorites = [];
-let draggedItem = null;
+/**
+ * 現在選択中のカテゴリIDを保持する変数
+ * 初期値は最初のカテゴリID
+ */
+let currentCategoryId = VOICE_DATA[0].id;
 
-// ドロップ位置情報を記憶するフラグ（今回は常に「前」に挿入するため、このフラグは視覚フィードバックの判定にのみ使用する）
-let isDroppingAfterTarget = false;
 
+// =================================================================
+// 3. ローカルストレージ操作 (メモ/お気に入り)
+// =================================================================
 
-function handleDragStart(e) {
-    draggedItem = this; // ドラッグされている要素を保持
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', this.dataset.voiceId);
-    
-    // ドラッグ要素に半透明と影を適用
-    this.classList.add('opacity-40', 'shadow-2xl');
-}
-
-function handleDragEnd(e) {
-    this.classList.remove('opacity-40', 'shadow-2xl');
-    // ドラッグオーバーのハイライトを全て除去
-    document.querySelectorAll('.voice-button').forEach(item => {
-        item.classList.remove('drag-over-top', 'drag-over-bottom');
-    });
-    draggedItem = null;
-}
-
-function handleDragOver(e) {
-    e.preventDefault(); // これが重要！ドロップを許可するために必要。
-
-    const targetItem = e.target.closest('.voice-button');
-    if (targetItem && targetItem !== draggedItem) {
-        // ドロップターゲットがボタンの場合、カーソル位置による上下判定はここでは行わない
-        // ロジックはシンプルに、ターゲット全体にドロップとして扱う
+/**
+ * ローカルストレージからお気に入りボイスの配列を取得します。
+ * @returns {Array<Object>} お気に入りボイスデータの配列
+ */
+function loadFavorites() {
+    const json = localStorage.getItem(STORAGE_KEY);
+    try {
+        return json ? JSON.parse(json) : [];
+    } catch (e) {
+        console.error("Failed to parse favorites from storage:", e);
+        return [];
     }
 }
 
 /**
- * ドラッグ要素がドロップターゲットから離れたときの処理
- * @param {Event} e
+ * お気に入りボイスの配列をローカルストレージに保存します。
+ * @param {Array<Object>} favorites - 保存するお気に入りボイスデータの配列
  */
- function handleDragLeave(e) {
-    // 離れた要素からクラスを削除
-    const item = e.target.closest('.voice-button');
-    if (item) {
-        item.classList.remove('drag-over-top', 'drag-over-bottom');
-    }
-}
-
-
-
-/**
- * ドラッグ要素がドロップされたときの処理
- * (配列の順序を変更し、UIを再描画する)
- * @param {Event} e
- */
- function handleDrop(e) {
-    e.stopPropagation(); // ブラウザデフォルトの処理を止める
-
-    // ドラッグオーバーのハイライトをリセット
-    document.querySelectorAll('.voice-button').forEach(item => {
-        item.classList.remove('drag-over-top', 'drag-over-bottom');
-    });
-    
-    // ドロップされたターゲット要素（voice-button要素全体）を取得
-    const targetItem = e.target.closest('.voice-button');
-    
-    // 状態をリセットする関数 (処理失敗時にも呼び出すため)
-    const resetDragState = () => {
-        if (draggedItem) {
-            draggedItem.classList.remove('opacity-40', 'shadow-2xl'); 
-        }
-        draggedItem = null;
-    };
-
-    if (!draggedItem) {
-        console.warn("[DEBUG] Drop skipped: draggedItem is null.");
-        return;
-    }
-
-    if (!targetItem || draggedItem === targetItem) {
-        console.warn("[DEBUG] Drop skipped: Invalid target or self-drop.");
-        resetDragState();
-        return;
-    }
-    
-    // IDを正しく取得
-    const voiceIdToMove = draggedItem.getAttribute('data-sound');
-    const targetVoiceId = targetItem.getAttribute('data-sound');
-    
-    const oldIndex = favorites.indexOf(voiceIdToMove);
-    const newIndex = favorites.indexOf(targetVoiceId);
-
-    if (oldIndex === -1 || newIndex === -1) {
-        console.error(`Drag/Drop failed: Voice ID not found in favorites array. Drag ID: ${voiceIdToMove}, Target ID: ${targetVoiceId}`);
-        resetDragState();
-        return; 
-    }
-
-    // ------------------------------------------------------------------
-    // ★★★★ 【最終修正ロジック】: ターゲットの直後に挿入
-    // ------------------------------------------------------------------
-    
-    // 1. 移動元要素を配列から取り出す（削除）
-    const movedItem = favorites.splice(oldIndex, 1)[0];
-    
-    // 2. 挿入するインデックスを計算する
-    let insertionIndex;
-
-    if (oldIndex < newIndex) {
-        // 例: 1を3へ移動 (2314)。
-        // 1を削除すると3のインデックスは 2-1=1 となる。元の3の位置 (newIndex=2) に挿入すればOK。
-        insertionIndex = newIndex; 
-    } else {
-        // 例: 3を1へ移動 (3124)。
-        // 3を削除しても1のインデックスは 0 のまま。1の直後(インデックス1)に挿入したい。
-        // ★修正★: ターゲットのインデックス newIndex の位置に挿入する。
-        // splice(newIndex, 0, movedItem)とすると、movedItemはnewIndexの要素の前に挿入される。
-        // ターゲット(1)の前に挿入し、ターゲットを後ろにずらすことで、「ターゲットの直後」を実現する。
-        // favorites.splice(0, 0, 3) -> [3, 1, 2, 4] となる。
-        insertionIndex = newIndex; 
-    }
-    
-    // 3. 新しい位置に要素を挿入
-    favorites.splice(insertionIndex, 0, movedItem);
-
-    // 4. UIを再レンダリング
-    updateFavoriteCategory(); 
-    showCategory('category-favorites'); 
-
-    // 5. ローカルストレージに保存
-    saveFavoritesToLocalStorage();
-
-    // 6. 状態をリセット
-    resetDragState();
-}
-
-
-/**
- * ローカルストレージからメモデータを読み込む
- */
-function loadFavoritesFromLocalStorage() {
-    const savedFavorites = localStorage.getItem(FAVORITES_KEY);
-    if (savedFavorites) {
-        try {
-            const parsed = JSON.parse(savedFavorites);
-            // Arrayとして読み込む (順序維持)
-            if (Array.isArray(parsed)) {
-                favorites = parsed;
-            }
-        } catch (e) {
-            console.error("Failed to parse favorites from localStorage", e);
-            favorites = [];
-        }
-    }
+function saveFavorites(favorites) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(favorites));
 }
 
 /**
- * メモデータをローカルストレージに保存する
+ * 指定されたボイスをメモ/お気に入りに登録します。
+ * @param {string} categoryId - ボイスが属するカテゴリID
+ * @param {string} file - ボイスのファイル名
+ * @param {string} text - ボイスの表示テキスト
  */
-function saveFavoritesToLocalStorage() {
-    // Arrayを保存
-    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
-}
+function toggleFavorite(categoryId, file, text) {
+    const favorites = loadFavorites();
+    const voiceKey = `${categoryId}:${file}`; // 一意のキー
+    const index = favorites.findIndex(f => f.voiceKey === voiceKey);
 
-/**
- * メモに登録されているかチェック
- * @param {string} voiceId - ボイスのユニークID
- */
-function isFavorite(voiceId) {
-    return favorites.includes(voiceId);
-}
-
-/**
- * メモ状態を切り替える (アイコン同期と登録順維持に対応)
- * @param {string} voiceId - ボイスのユニークID (folder/file.wav)
- * @param {Event} event - クリックイベント
- */
-function toggleFavorite(voiceId, event) {
-    if (event) {
-        event.stopPropagation();
-    }
-
-    const index = favorites.indexOf(voiceId);
-
-    if (index > -1) {
-        // 削除: ArrayからIDを削除
-        favorites.splice(index, 1);
-    } else {
-        // 追加: Arrayの末尾に追加 (挿入順を維持)
-        favorites.push(voiceId);
-    }
-
-    saveFavoritesToLocalStorage();
-    // Point 1: 全てのボタンの状態を更新
-    updateAllVoiceButtonStates();
-    
-    // Point 2: メモカテゴリの表示を更新 (登録順に再描画)
-    updateFavoriteCategory();
-
-    // ★修正★: 現在アクティブなカテゴリがメモの場合、空になったらメッセージが表示されるよう再描画を強制する
-    const activeLink = document.querySelector('.category-link.selected');
-    if (activeLink && activeLink.getAttribute('data-category-id') === 'category-favorites') {
-        showCategory('category-favorites');
-    }
-}
-
-/**
- * 全てのボイスボタンのメモアイコンの状態を更新する (Point 1対応)
- */
-function updateAllVoiceButtonStates() {
-    // DOMにあるすべてのボイスボタンを取得
-    const allVoiceButtons = document.querySelectorAll('.voice-button');
-
-    allVoiceButtons.forEach(button => {
-        const voiceId = button.getAttribute('data-sound');
-        const iconElement = button.querySelector('.favorite-icon');
-
-        if (iconElement) {
-            const isFav = isFavorite(voiceId);
-
-            if (isFav) {
-                iconElement.textContent = '★';
-                iconElement.classList.remove('text-gray-300');
-                iconElement.classList.add('text-yellow-400');
-            } else {
-                iconElement.textContent = '☆';
-                iconElement.classList.remove('text-yellow-400');
-                iconElement.classList.add('text-gray-300');
-            }
-        }
-    });
-}
-
-/**
- * メモに追加されているボイスデータを取得する (Point 2対応: 登録順にデータを取得)
- */
-function getFavoriteVoices() {
-    const favoriteList = [];
-
-    // 全ボイスデータをフラット化し、マップを作成 (効率的なルックアップのため)
-    const voiceMap = new Map();
-    VOICE_DATA.forEach(category => {
-        category.voices.forEach(voice => {
-            const voiceId = `${category.folder}/${voice.file}`;
-            voiceMap.set(voiceId, { voice, folder: category.folder });
+    if (index === -1) {
+        // 未登録の場合は追加
+        favorites.push({
+            voiceKey: voiceKey,
+            categoryId: categoryId,
+            file: file,
+            text: text,
+            folder: VOICE_DATA.find(c => c.id === categoryId).folder // フォルダ情報も保存
         });
-    });
+        console.log(`[Favorite] Added: ${text}`);
+    } else {
+        // 登録済みの場合は削除
+        favorites.splice(index, 1);
+        console.log(`[Favorite] Removed: ${text}`);
+    }
 
-    // favorites配列 (登録順/並び替え後の順序) に従ってデータを取得
-    favorites.forEach(voiceId => {
-        const item = voiceMap.get(voiceId);
-        if (item) {
-            favoriteList.push(item);
-        }
-    });
-
-    return favoriteList;
+    saveFavorites(favorites);
+    // 現在メモ画面が表示されている場合は再描画
+    if (currentCategoryId === FAVORITES_ID) {
+        renderContent(FAVORITES_ID);
+    }
 }
 
 /**
- * ★更新機能★: メモリストをクリアする
+ * お気に入りボイスリストを完全にクリアします。
  */
 function clearFavorites() {
-    // 1. favorites配列を空にする
-    favorites = [];
+    // ユーザーに確認を促すモーダルを表示する代わりに、メッセージを表示
+    console.log("favorites cleared.");
+    localStorage.removeItem(STORAGE_KEY);
 
-    // 2. ローカルストレージを更新
-    saveFavoritesToLocalStorage();
-
-    // 3. 全てのボタンの状態を更新 (★マークを☆マークに戻す)
-    updateAllVoiceButtonStates();
-
-    // 4. メモカテゴリの表示を更新 (「メモなし」の状態にする)
-    updateFavoriteCategory();
-
-    // 5. 現在アクティブなカテゴリがメモの場合、クリア後の画面を強制的に再表示
-    const activeLink = document.querySelector('.category-link.selected');
-    if (activeLink && activeLink.getAttribute('data-category-id') === 'category-favorites') {
-        showCategory('category-favorites');
-    }
-}
-
-
-// =================================================================
-// 3. UI生成ロジック
-// =================================================================
-
-/**
- * 個別のボイスボタンを作成する
- * @param {string} categoryFolder - カテゴリフォルダ名
- * @param {Object} voice - { text: string, file: string }
- * @param {boolean} isDraggable - ドラッグ可能かどうか
- */
-function createVoiceButton(categoryFolder, voice, isDraggable = false) {
-    const voiceId = `${categoryFolder}/${voice.file}`;
-    const button = document.createElement('button');
-    // 音声ボタンの縦幅を調整
-    button.className = `voice-button flex items-center justify-between p-3 rounded-xl shadow-lg transition-all duration-200 ease-in-out`;
-    button.setAttribute('data-sound', voiceId);
-    button.setAttribute('data-text', voice.text);
-    // ボタン全体でのクリックを音声再生に割り当て
-    button.setAttribute('onclick', `handleVoiceButtonClick('${voiceId}')`);
-
-    // ドラッグ＆ドロップ用属性 (メモカテゴリでのみ有効)
-    if (isDraggable) {
-        button.setAttribute('draggable', 'true');
+    // 現在メモ画面が表示されている場合は再描画して空にする
+    if (currentCategoryId === FAVORITES_ID) {
+        renderContent(FAVORITES_ID);
     }
 
-    // テキストコンテンツ
-    const textContent = document.createElement('span');
-    // text-contentクラスにはuser-select: none;とpointer-events: none;を適用している
-    textContent.className = 'text-content text-left text-white'; 
-    textContent.textContent = voice.text;
-    button.appendChild(textContent);
-
-    // メモアイコン
-    const iconSpan = document.createElement('span');
-    iconSpan.className = 'favorite-icon text-xl transition-colors duration-150';
-    
-    const isFav = isFavorite(voiceId);
-
-    if(isFav)
-    {
-        iconSpan.textContent = '★';
-        // メモの場合は黄色を適用
-        iconSpan.classList.add('text-yellow-400'); 
-    }else
-    {
-        iconSpan.textContent = '☆';
-        iconSpan.classList.add('text-gray-300');
-    }
-
-    //メモボタンのクリックイベントはトグル機能のみを実行
-    iconSpan.setAttribute('onclick', `toggleFavorite('${voiceId}', event)`);
-
-    button.appendChild(iconSpan);
-    return button;
-}
-
-/**
- * 通常カテゴリのセクションを作成する
- * @param {Object} category - カテゴリデータ
- */
-function createCategorySection(category) {
-    const section = document.createElement('section');
-    section.id = category.id;
-    section.className = 'category-section hidden';
-
-    const titleContainer = document.createElement('h2');
-    titleContainer.className = 'text-2xl font-bold text-gray-800 mb-4 pb-2 border-b border-gray-200';
-    
-    // 日本語タイトル
-    const jpTitle = document.createElement('span');
-    jpTitle.textContent = category.name;
-    jpTitle.className = 'mr-2';
-    titleContainer.appendChild(jpTitle);
-    
-    // 英語名 (en_name) を取得し、薄い文字で表示
-    const enTitle = document.createElement('span');
-    enTitle.textContent = `(${category.en_name})`;
-    enTitle.className = 'text-lg font-normal text-gray-400'; // 薄い文字色とフォントサイズ
-    titleContainer.appendChild(enTitle);
-
-    section.appendChild(titleContainer);
-
-    const grid = document.createElement('div');
-    grid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4';
-    section.appendChild(grid);
-
-    category.voices.forEach(voice => {
-        grid.appendChild(createVoiceButton(category.folder, voice, false));
-    });
-
-    return section;
-}
-
-/**
- * メモカテゴリのセクションを作成する (登録順に表示)
- * @param {Array<Object>} favoriteVoices - 登録順に並んだメモのボイスデータ
- */
-function createFavoriteCategorySection(favoriteVoices) {
-    const section = document.createElement('section');
-    section.id = 'category-favorites';
-    section.className = 'category-section hidden';
-
-    const titleContainer = document.createElement('h2');
-    titleContainer.className = 'text-2xl font-bold text-gray-800 mb-4 pb-2 border-b border-gray-200';
-    
-    // 日本語タイトル
-    const jpTitle = document.createElement('span');
-    jpTitle.textContent = 'メモ';
-    jpTitle.className = 'mr-2';
-    titleContainer.appendChild(jpTitle);
-    
-    // メモ (Bookmark) の英語表記を追加
-    const enTitle = document.createElement('span');
-    enTitle.textContent = `(Bookmark)`;
-    enTitle.className = 'text-lg font-normal text-gray-400'; // 薄い文字色とフォントサイズ
-    titleContainer.appendChild(enTitle);
-    
-    section.appendChild(titleContainer);
-
-    if(favoriteVoices.length === 0)
-    {
-        // メモが一つもない場合のメッセージ
-        const message = document.createElement('p');
-        message.className = 'text-gray-500 mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200';
-        message.textContent = 'ボイスがメモされてません';
-        section.appendChild(message);
-    }
-    else
-    {
-        //メモがある場合、ドラッグ可能なボタンをグリッド表示
-        const grid = document.createElement('div');
-        grid.id = 'favorites-grid';
-        grid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4';
-        section.appendChild(grid);
-
-        favoriteVoices.forEach(item => {
-            // メモのボイスボタンはドラッグ可能に設定
-            grid.appendChild(createVoiceButton(item.folder, item.voice, true));
-        });
-
-        // ドラッグ＆ドロップのイベントリスナーを設定
-        setupDragAndDrop(grid);
-    }
-
-    return section;
-}
-
-/**
- * メモカテゴリの内容を更新・再描画する
- */
-function updateFavoriteCategory() {
+    // 削除が完了したことをユーザーに知らせるUIメッセージを一時的に表示
     const mainContent = document.getElementById('main-content');
-    const oldFavoriteSection = document.getElementById('category-favorites');
-
-    // 既存のメモセクションを削除
-    if (oldFavoriteSection) {
-        mainContent.removeChild(oldFavoriteSection);
+    if (mainContent) {
+        const message = document.createElement('div');
+        // Tailwindクラスを使って以前のシンプルなメッセージを再現
+        message.className = 'absolute top-0 right-0 m-4 p-3 bg-red-100 text-red-700 rounded-lg shadow-lg';
+        message.textContent = '🗑️ メモがすべて削除されました。';
+        mainContent.appendChild(message);
+        setTimeout(() => message.remove(), 3000);
     }
-
-    // 新しいメモセクションを作成して挿入
-    const favoriteVoices = getFavoriteVoices();
-    const newFavoriteSection = createFavoriteCategorySection(favoriteVoices);
-    // メインコンテンツの最後に挿入
-    mainContent.appendChild(newFavoriteSection);
 }
 
+
+// =================================================================
+// 4. UI描画ロジック
+// =================================================================
+
 /**
- * カテゴリ一覧とコンテンツセクションを生成してDOMに挿入する
- * @param {Array<Object>} data - VOICE_DATA
+ * 指定されたカテゴリIDに基づいてメインコンテンツを描画します。
+ * @param {string} categoryId - 描画するカテゴリID
  */
-function generateAppStructure(data) {
-    const categoryNav = document.getElementById('category-nav');
+function renderContent(categoryId) {
+    currentCategoryId = categoryId;
     const mainContent = document.getElementById('main-content');
-    let firstCategoryId = ''; // 最初に表示するカテゴリIDを保持
+    mainContent.innerHTML = ''; // コンテンツをクリア
 
-    // 既存のコンテンツをクリア
-    categoryNav.innerHTML = '';
-    mainContent.innerHTML = '';
-
-    // 1. 通常カテゴリのナビゲーションリンクとコンテンツを作成
-    data.forEach(category =>
-        {
-        // ナビゲーションリンク
-        const link = document.createElement('a');
-        link.href = '#';
-        link.className = 'category-link block px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition duration-150 mb-1';
-        link.textContent = category.name;
-        link.setAttribute('data-category-id', category.id);
-        link.onclick = (e) => {
-            e.preventDefault();
-            showCategory(category.id);
-        };
-        categoryNav.appendChild(link);
-
-        // コンテンツセクション
-        mainContent.appendChild(createCategorySection(category));
-
-        // 最初のカテゴリを設定 (メモ以外の最初のカテゴリをデフォルトとする)
-        if (!firstCategoryId) {
-            firstCategoryId = category.id;
-        }
-    });
-
-    // 2. 通常カテゴリとメモの間に区切り線を追加
-    const separator = document.createElement('div');
-    separator.className = 'border-t border-gray-200 my-2 pt-2'; // 線の色とマージンを設定
-    categoryNav.appendChild(separator);
-
-    // 3. メモカテゴリのナビゲーションリンクを作成 (カテゴリリストの最後に移動)
-    const favoriteLink = document.createElement('a');
-    favoriteLink.href = '#';
-    favoriteLink.className = 'category-link block px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition duration-150 mb-1';
-    // リンク内の「★」を黄色にする 
-    favoriteLink.innerHTML = '<span class="text-yellow-500">★</span> メモ'; 
-    favoriteLink.setAttribute('data-category-id', 'category-favorites');
-    favoriteLink.onclick = (e) => {
-        e.preventDefault();
-        showCategory('category-favorites');
-    };
-    categoryNav.appendChild(favoriteLink);
-
-    // 4. メモカテゴリのコンテンツを作成 (最初に一度だけ生成、以降は更新)
-    updateFavoriteCategory();
-
-
-    // 5. 初期表示カテゴリを設定 (メモ以外の最初のカテゴリ)
-    if (firstCategoryId) {
-        showCategory(firstCategoryId);
-    }
-}
-
-
-// =================================================================
-// 4. ドラッグ＆ドロップ機能 (常にターゲットの前に挿入するように修正)
-// =================================================================
-
-/**
- * ドラッグ&ドロップイベントリスナーを設定
- * @param {HTMLElement} grid - メモボタンを含むコンテナ (favorites-grid)
- */
- function setupDragAndDrop(grid) {
-    if (!grid) return;
-
-    // --- Drag Start ---
-    grid.addEventListener('dragstart', (e) => {
-        const target = e.target.closest('.voice-button');
-        if (target) {
-            draggedItem = target;
-            e.dataTransfer.effectAllowed = 'move';
-            
-            // data-sound属性からIDを正しく取得してセット
-            e.dataTransfer.setData('text/plain', target.getAttribute('data-sound')); 
-            
-            // 半透明化と影の追加
-            setTimeout(() => target.classList.add('opacity-40', 'shadow-2xl'), 0); 
-        }
-    });
-
-    // --- Drag End ---
-    grid.addEventListener('dragend', (e) => {
-        if (draggedItem) {
-            // opacity-40とshadow-2xlの両方をリセット
-            draggedItem.classList.remove('opacity-40', 'shadow-2xl');
-        }
-        // ホバーエフェクトのリセット
-        grid.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
-            el.classList.remove('drag-over-top', 'drag-over-bottom');
-        });
-        draggedItem = null; // handleDropでもリセットされるが、念のため
-    });
-
-    // --- Drag Over (視覚フィードバック) ---
-    grid.addEventListener('dragover', (e) => {
-        e.preventDefault(); // ドロップを許可するために必要
-        if (draggedItem && draggedItem !== e.target.closest('.voice-button')) {
-            const target = e.target.closest('.voice-button');
-            const targetGrid = e.target.closest('#favorites-grid');
-
-            // ホバーエフェクトのリセット
-            targetGrid.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
-                el.classList.remove('drag-over-top', 'drag-over-bottom');
-            });
-
-            if (target) {
-                // ドロップ位置の Y 座標を取得
-                const rect = target.getBoundingClientRect();
-                const targetMiddleY = rect.top + rect.height / 2;
-                
-                // ドロップ時のカーソル位置をフィードバックに反映 (直後/直前)
-                if (e.clientY > targetMiddleY) {
-                    target.classList.add('drag-over-bottom'); // 直後に挿入のフィードバック
-                } else {
-                    target.classList.add('drag-over-top'); // 直前に挿入のフィードバック
-                }
-            }
-            e.dataTransfer.dropEffect = 'move';
-        }
-    });
-
-    // --- Drop (★最終修正★: DOM操作を削除し、handleDrop 関数に処理を委譲) ---
-    grid.addEventListener('drop', (e) => {
-        e.preventDefault();
-
-        // 配列操作、DOM再描画、状態リセットは全て handleDrop 内で行います。
-        handleDrop(e); 
-    });
-}
-
-
-// =================================================================
-// 5. UI操作ロジック
-// =================================================================
-
-/**
- * 表示するカテゴリを切り替える
- * @param {string} categoryId - 表示するカテゴリのID (例: 'category-favorites', 'category-greeting')
- */
-function showCategory(categoryId) {
-    // 全てのカテゴリセクションを非表示にする
-    document.querySelectorAll('.category-section').forEach(section => {
-        section.classList.add('hidden');
-    });
-
-    // 指定されたカテゴリセクションを表示する
-    const targetSection = document.getElementById(categoryId);
-    if (targetSection) {
-        targetSection.classList.remove('hidden');
-    }
-
-    // ナビゲーションリンクのアクティブ状態を切り替える
+    // サイドバーの選択状態を更新
     document.querySelectorAll('.category-link').forEach(link => {
-        link.classList.remove('selected', 'bg-blue-50', 'font-semibold');
+        link.classList.remove('selected');
+    });
+    const selectedLink = document.getElementById(`link-${categoryId}`);
+    if (selectedLink) {
+        selectedLink.classList.add('selected');
+    }
+
+    let voices = [];
+    let categoryName = '';
+
+    if (categoryId === FAVORITES_ID) {
+        // メモ/お気に入り
+        voices = loadFavorites();
+        categoryName = 'お気に入り (メモ)';
+    } else {
+        // 通常のカテゴリ
+        const category = VOICE_DATA.find(c => c.id === categoryId);
+        if (!category) return;
+        voices = category.voices;
+        categoryName = category.name;
+    }
+
+    // 1. タイトル描画
+    const titleHtml = `
+        <h2 class="text-3xl font-bold text-gray-800 mb-6 border-b-2 pb-2">
+            ${categoryName}
+            <span class="text-sm font-normal text-gray-500 ml-2">(${voices.length} 件)</span>
+        </h2>
+    `;
+    mainContent.insertAdjacentHTML('beforeend', titleHtml);
+
+    // 2. ボイスボタンのコンテナ描画
+    const container = document.createElement('div');
+    // 元のグリッドクラスを復元 (grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4)
+    container.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4';
+
+    if (categoryId === FAVORITES_ID) {
+        // お気に入りの場合はD&Dイベントを設定
+        container.addEventListener('dragover', handleDragOver);
+        container.addEventListener('drop', handleDrop);
+        container.addEventListener('dragleave', handleDragLeave);
+        container.id = 'voice-container'; // D&D用にIDを設定
+    }
+
+    mainContent.appendChild(container);
+
+    // 3. ボイスボタンの描画
+    if (voices.length === 0) {
+        container.innerHTML = `
+            <p class="text-gray-500 col-span-full py-8 text-center">
+                ${categoryId === FAVORITES_ID ? 'メモにボイスが登録されていません。<br>カテゴリーからボイスを☆で追加してください。' : 'このカテゴリにはまだボイスがありません。'}
+            </p>
+        `;
+    } else {
+        voices.forEach(voice => {
+            // カテゴリIDがメモではない場合は、元のカテゴリIDを使用
+            const originalCategoryId = categoryId === FAVORITES_ID ? voice.categoryId : categoryId;
+            const button = createVoiceButton(voice, originalCategoryId);
+            container.appendChild(button);
+        });
+    }
+
+    // ドラッグ中の要素がメインコンテンツ外でドロップされた場合に備えて、documentにもリスナーを設定
+    if (categoryId === FAVORITES_ID) {
+        document.addEventListener('dragend', handleDragEnd);
+    } else {
+        document.removeEventListener('dragend', handleDragEnd);
+    }
+}
+
+/**
+ * 個別のボイスボタン要素を生成します。
+ * @param {Object} voice - ボイスデータオブジェクト
+ * @param {string} originalCategoryId - ボイスが属する元のカテゴリID
+ * @returns {HTMLElement} 生成されたボタン要素
+ */
+function createVoiceButton(voice, originalCategoryId) {
+    // === ここが前の正しいUIロジックです。この構造を復元し、UIクラスは変更しません ===
+    const isFavorite = loadFavorites().some(f => f.voiceKey === `${originalCategoryId}:${voice.file}`);
+    const voiceKey = `${originalCategoryId}:${voice.file}`;
+    const folder = voice.folder || VOICE_DATA.find(c => c.id === originalCategoryId).folder;
+    const voiceText = voice.text;
+
+    const button = document.createElement('div');
+    // style.css に定義された `.voice-button` クラスを使用し、UIをCSSに委ねます
+    button.className = 'voice-button';
+    button.onclick = () => playVoice(folder, voice.file);
+    button.dataset.voiceKey = voiceKey;
+    button.dataset.categoryId = originalCategoryId;
+    button.dataset.file = voice.file;
+    button.dataset.text = voiceText;
+    button.dataset.folder = folder;
+
+    // 現在のカテゴリがメモ(FAVORITES_ID)の場合、ドラッグ可能にする
+    if (currentCategoryId === FAVORITES_ID) {
+        button.draggable = true;
+        button.addEventListener('dragstart', handleDragStart);
+    }
+
+
+    // 星アイコンのSVG要素を生成 (Tailwindクラスを直接使用し、style.cssと連携)
+    const starIcon = isFavorite ?
+        `<svg class="star-icon fill-current text-yellow-500" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>` :
+        `<svg class="star-icon fill-current text-gray-400" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
+
+    // ボタンのHTML構造を再構築 (前回の失敗で壊れた要素を修復)
+    button.innerHTML = `
+        <span class="voice-text">${voiceText}</span>
+        <button
+            class="favorite-button"
+            onclick="event.stopPropagation(); toggleFavorite('${originalCategoryId}', '${voice.file}', '${voiceText.replace(/'/g, "\\'")}')"
+            aria-label="${isFavorite ? 'メモから削除' : 'メモに追加'}"
+        >
+            ${starIcon}
+        </button>
+    `;
+
+    // D&D用にドロップターゲットのロジックを追加
+    if (currentCategoryId === FAVORITES_ID) {
+        button.addEventListener('dragenter', handleDragEnter);
+        button.addEventListener('dragleave', handleDragLeave);
+        button.addEventListener('dragover', handleDragOverOnButton);
+    }
+
+    return button;
+    // =========================================================================
+}
+
+/**
+ * サイドバーのナビゲーションを描画します。
+ */
+function renderSidebar() {
+    const navContainer = document.getElementById('category-nav');
+    navContainer.innerHTML = '';
+
+    // カテゴリのリンクを生成
+    VOICE_DATA.forEach(category => {
+        // 元のデザインのクラスを維持
+        const linkHtml = `
+            <a
+                href="#"
+                id="link-${category.id}"
+                class="category-link block p-2 mt-1 text-sm text-gray-700 hover:bg-gray-100 transition duration-100 rounded-lg whitespace-nowrap overflow-hidden text-ellipsis"
+                onclick="event.preventDefault(); renderContent('${category.id}')"
+            >
+                ${category.name}
+            </a>
+        `;
+        navContainer.insertAdjacentHTML('beforeend', linkHtml);
     });
 
-    const activeLink = document.querySelector(`.category-link[data-category-id="${categoryId}"]`);
-    if (activeLink) {
-        activeLink.classList.add('selected', 'bg-blue-50', 'font-semibold');
+    // お気に入り(メモ)のリンクを生成
+    // 元のデザインのクラスを維持
+    const favoritesLinkHtml = `
+        <a
+            href="#"
+            id="link-${FAVORITES_ID}"
+            class="category-link block p-2 mt-3 text-sm font-bold text-blue-700 border-t border-blue-200 hover:bg-blue-50 transition duration-100 rounded-lg whitespace-nowrap overflow-hidden text-ellipsis"
+            onclick="event.preventDefault(); renderContent('${FAVORITES_ID}')"
+        >
+            ⭐ お気に入り (メモ)
+        </a>
+    `;
+    navContainer.insertAdjacentHTML('beforeend', favoritesLinkHtml);
+
+    // 初期カテゴリを選択状態にする
+    const initialLink = document.getElementById(`link-${currentCategoryId}`);
+    if (initialLink) {
+        initialLink.classList.add('selected');
     }
+}
+
+
+// =================================================================
+// 5. ドラッグ＆ドロップロジック (メモ/お気に入りの並び替え)
+// =================================================================
+
+let draggedEl = null;
+
+/**
+ * ドラッグ開始時の処理
+ * @param {DragEvent} e
+ */
+function handleDragStart(e) {
+    draggedEl = e.currentTarget;
+    draggedEl.classList.add('dragging');
+    // ドラッグするボイスのkeyをセット
+    e.dataTransfer.setData(DRAG_DATA_KEY, draggedEl.dataset.voiceKey);
+    // ドラッグ&ドロップ操作中に要素が移動することを許可する
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+/**
+ * ドラッグ終了時の処理 (どこにドロップされても呼ばれる)
+ * @param {DragEvent} e
+ */
+function handleDragEnd(e) {
+    if (draggedEl) {
+        draggedEl.classList.remove('dragging');
+        draggedEl = null;
+    }
+    // 全てのドロップオーバー状態をリセット
+    document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
+        el.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+}
+
+/**
+ * ドロップターゲット上でのドラッグオーバー処理 (コンテナ)
+ * @param {DragEvent} e
+ */
+function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    // ボイスボタン要素以外のドロップオーバー状態をリセット
+    document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
+        if (!el.classList.contains('voice-button')) {
+            el.classList.remove('drag-over-top', 'drag-over-bottom');
+        }
+    });
+}
+
+/**
+ * ドロップターゲット上でのドラッグオーバー処理 (ボタン)
+ * @param {DragEvent} e
+ */
+function handleDragOverOnButton(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    const targetEl = e.currentTarget;
+    if (targetEl === draggedEl) return;
+
+    // 現在のマウス位置が要素の上半分か下半分かを判定
+    const rect = targetEl.getBoundingClientRect();
+    const isOverTopHalf = e.clientY < rect.top + rect.height / 2;
+
+    // ドロップインジケータのクラスを設定/リセット
+    document.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
+        if (el !== targetEl) {
+            el.classList.remove('drag-over-top', 'drag-over-bottom');
+        }
+    });
+
+    if (isOverTopHalf) {
+        targetEl.classList.add('drag-over-top');
+        targetEl.classList.remove('drag-over-bottom');
+    } else {
+        targetEl.classList.add('drag-over-bottom');
+        targetEl.classList.remove('drag-over-top');
+    }
+}
+
+/**
+ * ドロップターゲットからドラッグ要素が離れた時の処理
+ * @param {DragEvent} e
+ */
+function handleDragLeave(e) {
+    // コンテナから離れた場合にのみ、インジケータをリセット
+    if (e.currentTarget.id === 'voice-container') {
+        e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+    }
+    // ボタンから離れた場合、関連するクラスを削除
+    if (e.currentTarget.classList.contains('voice-button')) {
+        setTimeout(() => {
+            const relatedTarget = document.elementFromPoint(e.clientX, e.clientY);
+            if (!relatedTarget || (!relatedTarget.closest('.voice-button') && relatedTarget.id !== 'voice-container')) {
+                e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+            }
+        }, 0);
+    }
+}
+
+/**
+ * ドロップ時の処理 (コンテナ)
+ * @param {DragEvent} e
+ */
+function handleDrop(e) {
+    e.preventDefault();
+
+    const container = e.currentTarget;
+    let targetEl = e.target.closest('.voice-button'); // ドロップされた位置のボタン要素
+
+    if (!draggedEl) {
+        container.classList.remove('drag-over-top', 'drag-over-bottom');
+        if (targetEl) targetEl.classList.remove('drag-over-top', 'drag-over-bottom');
+        return;
+    }
+
+    if (draggedEl === targetEl) {
+        container.classList.remove('drag-over-top', 'drag-over-bottom');
+        if (targetEl) targetEl.classList.remove('drag-over-top', 'drag-over-bottom');
+        return;
+    }
+
+    const favorites = loadFavorites();
+    const draggedKey = draggedEl.dataset.voiceKey;
+    const draggedIndex = favorites.findIndex(f => f.voiceKey === draggedKey);
+
+    // ドラッグ対象の要素をリストから削除
+    const [voiceToMove] = favorites.splice(draggedIndex, 1);
+
+    if (targetEl) {
+        // ボタン上にドロップされた場合
+        const targetKey = targetEl.dataset.voiceKey;
+        const targetIndex = favorites.findIndex(f => f.voiceKey === targetKey);
+
+        const isOverTopHalf = targetEl.classList.contains('drag-over-top');
+
+        if (targetIndex !== -1) {
+            // ドロップインジケータに基づいて挿入位置を決定
+            const insertIndex = isOverTopHalf ? targetIndex : targetIndex + 1;
+            favorites.splice(insertIndex, 0, voiceToMove);
+        }
+
+        // クラスをリセット
+        targetEl.classList.remove('drag-over-top', 'drag-over-bottom');
+
+    } else {
+        // コンテナの何もない部分にドロップされた場合 (リストの最後に移動と見なす)
+        favorites.push(voiceToMove);
+    }
+
+    // 更新された配列を保存し、コンテンツを再描画
+    saveFavorites(favorites);
+    renderContent(FAVORITES_ID);
 }
 
 
@@ -871,10 +692,12 @@ function showCategory(categoryId) {
 // =================================================================
 
 /**
- * ボイスボタンがクリックされた時の処理
- * @param {string} soundPath - ボイスのユニークID (folder/file.wav)
+ * ボイスを再生します。
+ * @param {string} folderName - ボイスファイルが格納されているフォルダ名 (例: '01_greeting')
+ * @param {string} fileName - ボイスファイル名 (例: '汐空なみりです.mp3')
  */
-function handleVoiceButtonClick(soundPath) {
+function playVoice(folderName, fileName) {
+    const soundPath = `${folderName}/${fileName}`;
     const fullPath = 'sounds/' + soundPath;
 
     playAudioWithRetry(fullPath);
@@ -894,13 +717,16 @@ async function playAudioWithRetry(url, retries = 3) {
 
     } catch (error) {
         if (error.name === "NotAllowedError" || error.name === "AbortError") {
+            // ユーザー操作が必要な場合 (多くのブラウザの自動再生ポリシー)
             console.warn(`[Warning] Audio play restricted. Path: ${url}. (User interaction required)`);
         } else if (retries > 0) {
+            // リトライ処理
             const delay = Math.pow(2, 3 - retries) * 500;
             console.warn(`[Retry] Failed to load audio ${url}. Retrying in ${delay}ms...`);
             await new Promise(resolve => setTimeout(resolve, delay));
             playAudioWithRetry(url, retries - 1);
         } else {
+            // 全てのリトライが失敗
             console.error(`[Error] Failed to load audio after all retries: ${url}`, error);
         }
     }
@@ -911,12 +737,12 @@ async function playAudioWithRetry(url, retries = 3) {
 // 7. 初期化 (DOMContentLoadedイベントハンドラ)
 // =================================================================
 
-// DOMのロード完了を待ってから実行
 document.addEventListener('DOMContentLoaded', () => {
-    loadFavoritesFromLocalStorage(); // 最初にローカルストレージからメモを読み込む
-    generateAppStructure(VOICE_DATA);
-
-    // 初期化時に全てのボタンの星の状態を同期
-    updateAllVoiceButtonStates();
-
+    console.log("Application started.");
+    renderSidebar(); // サイドバーのカテゴリを描画
+    // 初期表示カテゴリを決定 (メモが空でない場合はメモを、そうでなければ最初のカテゴリ)
+    if (loadFavorites().length > 0) {
+        currentCategoryId = FAVORITES_ID;
+    }
+    renderContent(currentCategoryId); // メインコンテンツを描画
 });
