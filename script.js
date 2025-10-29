@@ -307,6 +307,7 @@ function renderCategoryNav() {
 
     // 初期表示として最初のカテゴリを選択
     if (VOICE_DATA.length > 0) {
+        // メモにデータがあればメモを、なければ最初のカテゴリを選択
         const initialCategory = favorites.length > 0 ? 'category-favorites' : VOICE_DATA[0].id;
         showContent(initialCategory);
     }
@@ -669,20 +670,18 @@ function handleDragEnd(e) {
 }
 
 // =================================================================
-// 6. ボイス再生 (Audioインスタンスの再利用を導入)
+// 6. ボイス再生 (Audioインスタンスの再利用を導入 - 長時間再生問題対策)
 // =================================================================
 
-// ★新規追加: プリロードされたAudioインスタンスを保持するマップ
-// キー: '01_greeting/汐空なみりです.mp3' のようなフルパス
-// 値: Audioインスタンス
+// ★修正点: プリロードされたAudioインスタンスを保持するマップ (Audio Pool)
 const audioPool = new Map();
 
-// ★新規追加: 現在再生中のAudioオブジェクトを保持するグローバル変数 (排他制御用)
+// ★修正点: 現在再生中のAudioオブジェクトを保持するグローバル変数 (排他制御用)
 let currentAudio = null;
 
 
 /**
- * 全ての音声ファイルをプリロードし、Audio Poolを構築する
+ * ★修正点: 全ての音声ファイルをプリロードし、Audio Poolを構築する
  */
 function preloadAudioPool() {
     console.log("[Audio] Preloading all voices...");
@@ -694,11 +693,9 @@ function preloadAudioPool() {
             const fullPath = `sounds/${soundPath}`;
             
             if (!audioPool.has(fullPath)) {
-                // 既に存在しない場合のみAudioインスタンスを生成
+                // 既に存在しない場合のみAudioインスタンスを生成しプール
                 const audio = new Audio(fullPath);
                 
-                // Audioインスタンスはメモリに保持されます。
-                // ロード完了を待つ必要はないが、ログで確認できると良い
                 audio.addEventListener('canplaythrough', () => {
                     console.log(`[Audio Pool] Ready: ${fullPath}`);
                 }, { once: true });
@@ -719,23 +716,23 @@ function playVoice(button) {
     const folder = button.getAttribute('data-folder');
     const file = button.getAttribute('data-file');
     const soundPath = `${folder}/${file}`;
-    const fullPath = `sounds/${soundPath}`;
+    const fullPath = 'sounds/' + soundPath;
 
-    // プリロードされたAudioインスタンスを取得して再生
+    // ★修正点: Audio Poolからインスタンスを取得
     const audioInstance = audioPool.get(fullPath);
 
     if (audioInstance) {
+        // プールされたインスタンスを再利用して再生
         playAudioFromPool(audioInstance, fullPath);
     } else {
-        // 万が一プールにない場合 (通常は発生しない) は、新規作成して再生
-        console.warn(`[Warning] Audio instance not found in pool for ${fullPath}. Creating new instance.`);
-        // 既存のplayAudioWithRetryを利用（排他制御は含まれない）
+        // 万が一プールにない場合 (通常は発生しない) は、新規作成して再生 (フォールバック)
+        console.warn(`[Warning] Audio instance not found in pool for ${fullPath}. Falling back to new instance.`);
         playAudioWithRetry(fullPath); 
     }
 }
 
 /**
- * Audio Poolから取得したインスタンスを再生する (排他制御あり)
+ * ★修正点: Audio Poolから取得したインスタンスを再生する (排他制御あり)
  * @param {HTMLAudioElement} audio - 再生するAudioインスタンス
  * @param {string} url - ログ表示用のURL
  */
@@ -776,24 +773,19 @@ async function playAudioFromPool(audio, url) {
 
 /**
  * 指数バックオフ付きのAudio新規作成・再生関数 (予備/エラー処理用)
- * ※これはプールに存在しなかった場合のフォールバックです。
  * @param {string} url - 再生する音声ファイルのURL
  * @param {number} retries - 残りのリトライ回数
  */
 async function playAudioWithRetry(url, retries = 3) {
-    // この関数はプールが使えない場合のフォールバックであり、
-    // 長時間利用によるリソース問題は解決しないことに注意。
-    
     try {
         const audio = new Audio(url);
-        audio.currentTime = 0; 
-        
+        audio.currentTime = 0;
         await audio.play();
-        console.log(`[Success] Audio requested and playing (New Instance): ${url}`);
+        console.log(`[Success] Audio requested (New Instance): ${url}`);
 
     } catch (error) {
         if (error.name === "NotAllowedError" || error.name === "AbortError") {
-            console.warn(`[Warning] Audio play restricted or aborted. Path: ${url}. Error: ${error.name}`);
+            console.warn(`[Warning] Audio play restricted. Path: ${url}. (User interaction required)`);
         } else if (retries > 0) {
             const delay = Math.pow(2, 3 - retries) * 500;
             console.warn(`[Retry] Failed to load audio ${url}. Retrying in ${delay}ms...`);
@@ -813,11 +805,8 @@ async function playAudioWithRetry(url, retries = 3) {
 document.addEventListener('DOMContentLoaded', () => {
     console.log("App Initializing...");
     
-    // ★重要: UI構築前に全Audioインスタンスを生成・プールする
+    // ★重要: UI構築前に全Audioインスタンスを生成・プールする (長時間再生問題対策)
     preloadAudioPool(); 
     
     renderCategoryNav();
 });
-
-
-
