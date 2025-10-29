@@ -455,7 +455,7 @@ function createVoiceButton(voice, folder, categoryId, isFavorite, isDraggable) {
     const starButton = document.createElement('button');
     starButton.type = 'button';
     
-    // ★ 修正箇所: お気に入り状態によって色を切り替える (★は青, ☆は灰色)
+    // お気に入り状態によって色を切り替える (★は青, ☆は灰色)
     const starColorClass = isFavorite ? 'text-blue-500' : 'text-gray-400'; 
     starButton.className = `absolute top-1 right-1 text-lg leading-none p-1 transition duration-150 ${starColorClass} hover:text-blue-700`;
     
@@ -682,131 +682,43 @@ function handleDragEnd(e) {
 }
 
 // =================================================================
-// 6. ボイス再生 (Audioインスタンスの再利用による不具合修正 - Audio Pool)
+// 6. ボイス再生 (同時再生対応)
 // =================================================================
 
-// ★ Audio Pool: プリロードされたAudioインスタンスを保持するマップ
-// モバイルでの音切れ・長時間再生問題対策
-const audioPool = new Map();
-
-// ★ 排他制御用: 現在再生中のAudioオブジェクトを保持するグローバル変数
-let currentAudio = null;
-
-
 /**
- * ★ 全ての音声ファイルをプリロードし、Audio Poolを構築する
- */
-function preloadAudioPool() {
-    console.log("[Audio] Preloading all voices...");
-
-    VOICE_DATA.forEach(category => {
-        const folder = category.folder;
-        category.voices.forEach(voice => {
-            const soundPath = `${folder}/${voice.file}`;
-            const fullPath = `sounds/${soundPath}`;
-
-            if (!audioPool.has(fullPath)) {
-                // 既に存在しない場合のみAudioインスタンスを生成しプール
-                const audio = new Audio(fullPath);
-
-                audio.addEventListener('canplaythrough', () => {
-                    console.log(`[Audio Pool] Ready: ${fullPath}`);
-                }, { once: true });
-                
-                // Audioを再生完了時にcurrentAudioをnullに戻すリスナーを設定
-                audio.addEventListener('ended', () => {
-                    if (currentAudio === audio) {
-                        currentAudio = null;
-                    }
-                });
-
-                audioPool.set(fullPath, audio);
-            }
-        });
-    });
-    console.log(`[Audio] Preload complete. ${audioPool.size} instances created in pool.`);
-}
-
-
-/**
- * ボイスを再生する
+ * ボイスを再生する (同時再生対応のため、常に新しいAudioインスタンスを生成)
  * @param {HTMLElement} button - クリックされたボイスボタン要素
  */
 function playVoice(button) {
     const file = button.getAttribute('data-file');
     const folder = button.getAttribute('data-folder');
-    const soundPath = `${folder}/${file}`;
-    const fullPath = `sounds/${soundPath}`;
+    const fullPath = `sounds/${folder}/${file}`;
 
-    // 1. Audio Poolからインスタンスを取得
-    const audio = audioPool.get(fullPath);
+    // ★ 修正箇所: 常に新しい Audio インスタンスを生成する
+    const audio = new Audio(fullPath);
 
-    if (!audio) {
-        console.error(`[Audio] Audio instance not found in pool: ${fullPath}`);
-        // フォールバック: Audioタグを新規作成して再生 (非推奨)
-        playAudioWithRetry(fullPath);
-        return;
-    }
+    // 複数の音が同時に鳴るように、排他制御は行いません。
+    // Audioオブジェクトは再生終了後にガベージコレクションされるため、
+    // プール管理も不要になります。
 
-    // 2. 排他制御: 現在再生中の音声があれば停止
-    if (currentAudio && currentAudio !== audio) {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;
-        console.log(`[Audio Stop] Paused previous voice.`);
-    }
-
-    // 3. 再生処理
+    // 再生処理
     try {
-        // 再生位置をリセット
         audio.currentTime = 0; 
         
-        // 再生を試みる
+        // play()はPromiseを返すため、エラーハンドリングを行います
         const playPromise = audio.play();
 
         if (playPromise !== undefined) {
             playPromise.then(() => {
-                // 成功: 現在再生中のAudioとして設定
-                currentAudio = audio;
-                console.log(`[Success] Audio played from pool: ${file}`);
+                console.log(`[Success] Audio played: ${file}`);
             }).catch(error => {
                 // 失敗 (ユーザー操作の制限など)
                 console.warn(`[Warning] Audio play failed (restricted or error). Path: ${file}`, error.name);
-                // 失敗した場合は currentAudio を設定しない
             });
-        } else {
-            // Promiseを返さないブラウザの場合 (古い環境など)
-            currentAudio = audio;
-            console.log(`[Success] Audio played immediately from pool: ${file}`);
         }
 
     } catch (error) {
-        console.error(`[Error] Failed to play audio from pool: ${file}`, error);
-    }
-}
-
-/**
- * 指数バックオフ付きのFetch関数 (Audio Poolで見つからなかった場合のフォールバック)
- * @param {string} url - 再生する音声ファイルのURL
- * @param {number} retries - 残りのリトライ回数
- */
-async function playAudioWithRetry(url, retries = 3) {
-    try {
-        const audio = new Audio(url);
-        audio.currentTime = 0;
-        await audio.play();
-        console.log(`[Success] Audio requested (fallback): ${url}`);
-
-    } catch (error) {
-        if (error.name === "NotAllowedError" || error.name === "AbortError") {
-            console.warn(`[Warning] Audio play restricted. Path: ${url}. (User interaction required)`);
-        } else if (retries > 0) {
-            const delay = Math.pow(2, 3 - retries) * 500;
-            console.warn(`[Retry] Failed to load audio ${url}. Retrying in ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            playAudioWithRetry(url, retries - 1);
-        } else {
-            console.error(`[Error] Failed to load audio after all retries: ${url}`, error);
-        }
+        console.error(`[Error] Failed to play audio: ${file}`, error);
     }
 }
 
@@ -816,9 +728,6 @@ async function playAudioWithRetry(url, retries = 3) {
 // =================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Audio Poolの初期化 (プリロード)
-    preloadAudioPool();
-    
-    // 2. UIのレンダリング
+    // 1. UIのレンダリング
     renderCategoryNav();
 });
