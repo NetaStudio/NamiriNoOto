@@ -27,6 +27,7 @@ const VOICE_DATA =
             { text: "また！", file: "また！.mp3" },
             { text: "おやすみ～", file: "おやすみ～.mp3" },
             { text: "ばいば～い", file: "ばいば～い.mp3" },
+            { text: "よ～しくお願いします", file: "よ～しくお願いします.mp3" },
             { text: "君のハート", file: "君のハート.mp3" },
             { text: "びしょぬれ注意だよ？", file: "びしょぬれ注意だよ？.mp3" },
             { text: "誕生日は1月26日", file: "誕生日は1月26日.mp3" },
@@ -46,6 +47,10 @@ const VOICE_DATA =
             { text: "ん", file: "ん.mp3" },
             { text: "へい", file: "へい.mp3" },
             { text: "いいよ特別ね", file: "いいよ特別ね.mp3" },
+            { text: "OK", file: "OK.mp3" },
+            { text: "OKです", file: "OKです.mp3" },
+            { text: "ぜひぜひ", file: "ぜひぜひ.mp3" },
+            { text: "歓迎です", file: "歓迎です.mp3" },
         ]
     },
     {
@@ -98,11 +103,12 @@ const VOICE_DATA =
         voices:
         [
             { text: "いえーい", file: "いえーい.mp3" },
-            { text: "おい見たか", file: "おい見たか.mp3" },
             { text: "よしよしよし", file: "よしよしよし.mp3" },
             { text: "やったーはははは", file: "やったーはははは.mp3" },
             { text: "嬉しいな～ななな～な", file: "嬉しいな～ななな～な.mp3" },
             { text: "ばーーーーか", file: "ばーーーーか.mp3" },
+            { text: "まじっすか", file: "まじっすか.mp3" },
+            { text: "満足かな", file: "満足かな.mp3" },
         ]
     },
     {
@@ -140,6 +146,10 @@ const VOICE_DATA =
             { text: "悲しすぎるよ", file: "悲しすぎるよ.mp3" },
             { text: "もうバカ！", file: "もうバカ！.mp3" },
             { text: "この有様でした", file: "この有様でした.mp3" },
+            { text: "うぇ～へへへ", file: "うぇ～へへへ.mp3" },
+            { text: "ク～ッソ", file: "ク～ッソ.mp3" },
+            { text: "ハァ", file: "ハァ.mp3" },
+            { text: "不安だな", file: "不安だな.mp3" },
         ]
     },
     {
@@ -154,6 +164,7 @@ const VOICE_DATA =
             { text: "いや～はははは", file: "いや～はははは.mp3" },
             { text: "かはははは", file: "かはははは.mp3" },
             { text: "ふふはは", file: "ふふはは.mp3" },
+            { text: "んふふふふ", file: "んふふふふ.mp3" },
             { text: "楽しい航海にしてやろうじゃん", file: "楽しい航海にしてやろうじゃん.mp3" },
         ]
     },
@@ -166,6 +177,7 @@ const VOICE_DATA =
         [
             { text: "ありがとー", file: "ありがとー.mp3" },
             { text: "Thank you", file: "Thank you.mp3" },
+            { text: "ありがたいです", file: "ありがたいです.mp3" },
             { text: "本当にありがとうございます", file: "本当にありがとうございます.mp3" },
         ]
     },
@@ -195,8 +207,10 @@ const VOICE_DATA =
             { text: "ざーーーこ", file: "ざーーーこ.mp3" },
             { text: "残念でした", file: "残念でした.mp3" },
             { text: "ばーか", file: "ばーか.mp3" },
+            { text: "おい見たか", file: "おい見たか.mp3" },
             { text: "まぁまぁまぁまぁ", file: "まぁまぁまぁまぁ.mp3" },
             { text: "良い子だね？", file: "良い子だね？.mp3" },
+            { text: "キャー怖～いw", file: "キャー怖～いw.mp3" },
         ]
     },
     {
@@ -208,10 +222,15 @@ const VOICE_DATA =
         [
             { text: "まぎまぎ", file: "まぎまぎ.mp3" },
             { text: "むぎむぎ", file: "むぎむぎ.mp3" },
+            { text: "わせわせ", file: "わせわせ.mp3" },
+            { text: "グルグル", file: "グルグル.mp3" },
+            { text: "バクバク", file: "バクバク.mp3" },
+            { text: "ブルブル", file: "ブルブル.mp3" },
+            { text: "ドン", file: "ドン.mp3" },
+            { text: "どかーん", file: "どかーん.mp3" },
             { text: "えっほえっほ", file: "えっほえっほ.mp3" },
             { text: "じーーーー", file: "じーーーー.mp3" },
-            { text: "どかーん", file: "どかーん.mp3" },
-            { text: "わせわせ", file: "わせわせ.mp3" },
+            { text: "むにゅ", file: "むにゅ.mp3" },
         ]
     },
     {
@@ -232,7 +251,6 @@ const VOICE_DATA =
             { text: "今のなんか語弊あったかなぁ", file: "今のなんか語弊あったかなぁ.mp3" },
             { text: "何見てんのセクハラ", file: "何見てんのセクハラ.mp3" },
             { text: "忘れろビーム", file: "忘れろビーム.mp3" },
-            { text: "満足かな", file: "満足かな.mp3" },
         ]
     }
 ];
@@ -920,5 +938,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateAllVoiceButtonStates();
 
 });
+
 
 
