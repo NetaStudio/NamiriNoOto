@@ -51,6 +51,10 @@ const VOICE_DATA =
             { text: "OKです", file: "OKです.mp3" },
             { text: "ぜひぜひ", file: "ぜひぜひ.mp3" },
             { text: "歓迎です", file: "歓迎です.mp3" },
+            { text: "ありがとー", file: "ありがとー.mp3" },
+            { text: "ありがたいです", file: "ありがたいです.mp3" },
+            { text: "本当にありがとうございます", file: "本当にありがとうございます.mp3" },
+            { text: "Thank you", file: "Thank you.mp3" },
         ]
     },
     {
@@ -74,6 +78,7 @@ const VOICE_DATA =
             { text: "何してんだ！", file: "何してんだ！.mp3" },
             { text: "許しません", file: "許しません.mp3" },
             { text: "そんなバナナー！", file: "そんなバナナー！.mp3" },
+            { text: "もうえぇでしょ", file: "もうえぇでしょ.mp3" },
         ]
     },
     {
@@ -150,6 +155,8 @@ const VOICE_DATA =
             { text: "ク～ッソ", file: "ク～ッソ.mp3" },
             { text: "ハァ", file: "ハァ.mp3" },
             { text: "不安だな", file: "不安だな.mp3" },
+            { text: "すまん", file: "すまん.mp3" },
+            { text: "気付いてませんでした", file: "気付いてませんでした.mp3" },
         ]
     },
     {
@@ -169,32 +176,6 @@ const VOICE_DATA =
         ]
     },
     {
-        id: "category-thank",
-        name: "感謝",
-        en_name: "Thank",
-        folder: "09_thank",
-        voices:
-        [
-            { text: "ありがとー", file: "ありがとー.mp3" },
-            { text: "Thank you", file: "Thank you.mp3" },
-            { text: "ありがたいです", file: "ありがたいです.mp3" },
-            { text: "本当にありがとうございます", file: "本当にありがとうございます.mp3" },
-        ]
-    },
-    {
-        id: "category-sorry",
-        name: "謝罪",
-        en_name: "Sorry",
-        folder: "10_sorry",
-        voices:
-        [
-            { text: "すまん", file: "すまん.mp3" },
-            { text: "ごめ～んね？", file: "ごめ～んね？.mp3" },
-            { text: "気付いてませんでした", file: "気付いてませんでした.mp3" },
-            { text: "もうえぇでしょ", file: "もうえぇでしょ.mp3" },
-        ]
-    },
-    {
         id: "category-inciting",
         name: "煽り",
         en_name: "Inciting",
@@ -206,6 +187,7 @@ const VOICE_DATA =
             { text: "そんなこともできないの？", file: "そんなこともできないの？.mp3" },
             { text: "ざーーーこ", file: "ざーーーこ.mp3" },
             { text: "残念でした", file: "残念でした.mp3" },
+            { text: "ごめ～んね？", file: "ごめ～んね？.mp3" },
             { text: "ばーか", file: "ばーか.mp3" },
             { text: "おい見たか", file: "おい見たか.mp3" },
             { text: "まぁまぁまぁまぁ", file: "まぁまぁまぁまぁ.mp3" },
@@ -938,6 +920,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateAllVoiceButtonStates();
 
 });
+
 
 
 
