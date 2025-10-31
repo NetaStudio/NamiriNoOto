@@ -248,7 +248,8 @@ const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 const AUDIO_POOL = new Map();
 /** ロード済みカテゴリIDを保持するセット */
 const loadedCategories = new Set();
-
+/** ★新規追加★: オーディオコンテキストがユーザー操作によって起動されたかどうかを示すフラグ */
+let isAudioContextStarted = false;
 
 /**
  * Web Audio API を使って音声ファイルをフェッチし、デコードする
@@ -315,6 +316,69 @@ function preloadCategoryVoices(categoryId) {
         loadedCategories.add(categoryId);
     });
 }
+
+
+
+
+// =================================================================
+// [新規追加] Web Audio API コンテキストの確実な起動
+// =================================================================
+
+/**
+ * Web Audio APIを完全に起動させるための無音バッファ再生
+ */
+function playSilentBuffer() {
+    // 1サンプル長 (極めて短い) の無音バッファを作成
+    const buffer = audioContext.createBuffer(1, 1, audioContext.sampleRate);
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioContext.destination);
+    source.start(0);
+    source.onended = () => {
+        source.disconnect();
+    };
+}
+
+/**
+ * ユーザーの最初の操作で AudioContext を確実に起動させる
+ * (Web Audio API のポリシー回避)
+ * @returns {Promise<void>} - 起動処理が完了したら解決するPromise
+ */
+function ensureAudioContextStarted() {
+    if (isAudioContextStarted) {
+        return Promise.resolve();
+    }
+
+    // コンテキストの起動処理をPromiseとして返す
+    return new Promise(resolve => {
+        if (audioContext.state === 'suspended') {
+            audioContext.resume().then(() => {
+                console.log("[AudioContext] Resumed successfully.");
+                isAudioContextStarted = true;
+                playSilentBuffer(); // 無音バッファを再生し、完全にオーディオシステムをアクティブにする
+                resolve();
+            }).catch(e => {
+                console.error("[AudioContext] Failed to resume:", e);
+                isAudioContextStarted = true; // 失敗しても、次回チェックをスキップするためにフラグは立てる
+                resolve();
+            });
+        } else if (audioContext.state === 'running') {
+            isAudioContextStarted = true;
+            console.log("[AudioContext] Already running.");
+            playSilentBuffer();
+            resolve();
+        } else {
+            resolve(); // その他の状態 (closedなど)
+        }
+    });
+}
+
+
+
+
+
+
+
 
 // =================================================================
 // 2. メモ機能の管理 (Arrayに変更し、順序を保持)
@@ -1007,32 +1071,30 @@ function playAudioBuffer(buffer) {
  * ボイスボタンがクリックされた時の処理
  * @param {string} soundPath - ボイスのユニークID (folder/file.wav)
  */
-function handleVoiceButtonClick(soundPath) {
-    // Web Audio APIのコンテキストがサスペンドされている場合、再開を試みる
-    if (audioContext.state === 'suspended') {
-        audioContext.resume().catch(e => {
-            console.error("Failed to resume AudioContext:", e);
-        });
-    }
+/**
+ * ボイスボタンがクリックされた時の処理 (async関数に変更)
+ * @param {string} soundPath - ボイスのユニークID (folder/file.wav)
+ */
+async function handleVoiceButtonClick(soundPath) {
+    // ★修正点1: 最初にAudioContextの起動が完了するまで待つ
+    // これにより、初回タップ時の途切れの原因を排除
+    await ensureAudioContextStarted();
 
     const audioBuffer = AUDIO_POOL.get(soundPath);
     const fullPath = 'sounds/' + soundPath;
 
     // 1. AudioBufferがプールに存在しない場合 (デコード未完了)
     if (!audioBuffer) {
-        console.warn(`[Play] Fallback: AudioBuffer not ready for: ${soundPath}. Retrying with fetch/decode.`);
+        console.warn(`[Play] Fallback: AudioBuffer not ready for: ${soundPath}. Fetching and decoding now.`);
 
-        // ★重要: データが間に合わなかった場合、その場で再度フェッチして再生
-        // これも非同期なので、初回は僅かな遅延があるが、最も確実
-        loadAndDecodeAudio(fullPath)
-            .then(buffer => {
-                playAudioBuffer(buffer);
-                // 間に合わなかった AudioBuffer を次回のためにプールに保存
-                AUDIO_POOL.set(soundPath, buffer);
-            })
-            .catch(error => {
-                console.error(`[Error] Fallback play failed: ${soundPath}`, error);
-            });
+        // コンテキストの起動は保証されたので、あとはデコードが間に合えばOK
+        try {
+            const buffer = await loadAndDecodeAudio(fullPath);
+            playAudioBuffer(buffer);
+            AUDIO_POOL.set(soundPath, buffer); // 次回のために保存
+        } catch (error) {
+            console.error(`[Error] Fallback play failed: ${soundPath}`, error);
+        }
 
         return;
     }
