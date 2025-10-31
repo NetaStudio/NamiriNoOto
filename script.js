@@ -238,13 +238,16 @@ const VOICE_DATA =
 ];
 
 
-
+/** 事前ロードされた Audio インスタンスを保持するマップ */
 const AUDIO_POOL = new Map();
+/** ロード済みカテゴリIDを保持するセット */
 const loadedCategories = new Set();
 
+
 /**
- * ★修正: 指定されたカテゴリの音声ファイルのみをロードする
+ * 指定されたカテゴリの音声ファイルのみをプールに準備し、準備完了を待つ
  * @param {string} categoryId - ロード対象のカテゴリID
+ * @returns {Promise<void>} - 全ての音声が 'loadeddata' 状態になったら解決するPromise
  */
 function preloadCategoryVoices(categoryId) {
     if (loadedCategories.has(categoryId)) {
@@ -275,10 +278,10 @@ function preloadCategoryVoices(categoryId) {
                     resolve();
                 }, { once: true });
 
-                // 何らかの理由でロードに失敗した場合も処理をブロックしないようにする
+                // ロード失敗時も処理をブロックしない
                 audio.addEventListener('error', (e) => {
                     console.error(`[Load Error] Failed to load ${voiceId}:`, e);
-                    resolve(); // エラーでもブロックしない
+                    resolve();
                 }, { once: true });
 
                 // ロードを開始
@@ -293,12 +296,10 @@ function preloadCategoryVoices(categoryId) {
         loadedCategories.add(categoryId);
         console.log(`[Lazy Load] All audio prepared for: ${category.name}.`);
     }).catch(e => {
-        // 全体のロード処理でエラーが発生した場合のロギング
         console.error(`[Load Error] Failed to prepare all audio for: ${category.name}`, e);
-        loadedCategories.add(categoryId); // エラーでも一旦ロード済みにする（再試行を防ぐ）
+        loadedCategories.add(categoryId);
     });
 }
-
 
 // =================================================================
 // 2. メモ機能の管理 (Arrayに変更し、順序を保持)
@@ -590,14 +591,14 @@ function clearFavorites() {
 // =================================================================
 // 3. UI生成ロジック
 // =================================================================
-
 /**
- * 個別のボイスボタンを作成する
+ * 個別のボイスボタンを作成する (変更なし)
  * @param {string} categoryFolder - カテゴリフォルダ名
  * @param {Object} voice - { text: string, file: string }
  * @param {boolean} isDraggable - ドラッグ可能かどうか
  */
 function createVoiceButton(categoryFolder, voice, isDraggable = false) {
+    // ... (createVoiceButton の中身は変更なし) ...
     const voiceId = `${categoryFolder}/${voice.file}`;
     const button = document.createElement('button');
     // 音声ボタンの縦幅を調整
@@ -614,7 +615,6 @@ function createVoiceButton(categoryFolder, voice, isDraggable = false) {
 
     // テキストコンテンツ
     const textContent = document.createElement('span');
-    // text-contentクラスにはuser-select: none;とpointer-events: none;を適用している
     textContent.className = 'text-content text-left text-white';
     textContent.textContent = voice.text;
     button.appendChild(textContent);
@@ -644,13 +644,11 @@ function createVoiceButton(categoryFolder, voice, isDraggable = false) {
 }
 
 /**
- * 通常カテゴリのセクションを作成する
+ * ★新規追加: 通常カテゴリのセクションの中身（タイトルとボタン群）のみを作成する
  * @param {Object} category - カテゴリデータ
  */
-function createCategorySection(category) {
-    const section = document.createElement('section');
-    section.id = category.id;
-    section.className = 'category-section hidden';
+function createCategorySectionContent(category) {
+    const contentDiv = document.createElement('div'); // 全体を包むコンテナ
 
     const titleContainer = document.createElement('h2');
     titleContainer.className = 'text-2xl font-bold text-gray-800 mb-4 pb-2 border-b border-gray-200';
@@ -664,27 +662,41 @@ function createCategorySection(category) {
     // 英語名 (en_name) を取得し、薄い文字で表示
     const enTitle = document.createElement('span');
     enTitle.textContent = `(${category.en_name})`;
-    enTitle.className = 'text-lg font-normal text-gray-400'; // 薄い文字色とフォントサイズ
+    enTitle.className = 'text-lg font-normal text-gray-400';
     titleContainer.appendChild(enTitle);
 
-    section.appendChild(titleContainer);
+    contentDiv.appendChild(titleContainer);
 
     const grid = document.createElement('div');
     grid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4';
-    section.appendChild(grid);
+    contentDiv.appendChild(grid);
 
     category.voices.forEach(voice => {
         grid.appendChild(createVoiceButton(category.folder, voice, false));
     });
 
+    return contentDiv; // コンテンツ全体を返す
+}
+
+
+/**
+ * ★新規追加: 空のカテゴリセクション要素のみを作成する (遅延レンダリング用)
+ * @param {Object} category - カテゴリデータ
+ */
+function createEmptyCategorySection(category) {
+    const section = document.createElement('section');
+    section.id = category.id;
+    section.className = 'category-section hidden';
+    // 初期は空のまま返却
     return section;
 }
 
 /**
- * メモカテゴリのセクションを作成する (登録順に表示)
+ * メモカテゴリのセクションを作成する (変更なし)
  * @param {Array<Object>} favoriteVoices - 登録順に並んだメモのボイスデータ
  */
 function createFavoriteCategorySection(favoriteVoices) {
+    // ... (createFavoriteCategorySection の中身は変更なし) ...
     const section = document.createElement('section');
     section.id = 'category-favorites';
     section.className = 'category-section hidden';
@@ -734,8 +746,9 @@ function createFavoriteCategorySection(favoriteVoices) {
     return section;
 }
 
+
 /**
- * メモカテゴリの内容を更新・再描画する
+ * メモカテゴリの内容を更新・再描画する (変更なし)
  */
 function updateFavoriteCategory() {
     const mainContent = document.getElementById('main-content');
@@ -754,7 +767,7 @@ function updateFavoriteCategory() {
 }
 
 /**
- * カテゴリ一覧とコンテンツセクションを生成してDOMに挿入する
+ * カテゴリ一覧とコンテンツセクションを生成してDOMに挿入する (★遅延レンダリング対応★)
  * @param {Array<Object>} data - VOICE_DATA
  */
 function generateAppStructure(data) {
@@ -777,17 +790,12 @@ function generateAppStructure(data) {
         link.setAttribute('data-category-id', category.id);
         link.onclick = (e) => {
             e.preventDefault();
-            // ★修正点1★: showCategory に処理を委譲
             showCategory(category.id);
         };
         categoryNav.appendChild(link);
 
-        // ★修正点2★: 初期ロード時にコンテンツセクションの生成をスキップし、空のセクションだけ作成
-        const emptySection = document.createElement('section');
-        emptySection.id = category.id;
-        emptySection.className = 'category-section hidden';
-        mainContent.appendChild(emptySection);
-
+        // ★修正点★: createEmptyCategorySection を呼び出し、空のセクションを作成
+        mainContent.appendChild(createEmptyCategorySection(category));
 
         // 最初のカテゴリを設定 (メモ以外の最初のカテゴリをデフォルトとする)
         if (!firstCategoryId) {
@@ -906,7 +914,7 @@ function generateAppStructure(data) {
 // =================================================================
 
 /**
- * 表示するカテゴリを切り替える (★修正: 遅延レンダリングとロードを追加★)
+ * 表示するカテゴリを切り替える
  * @param {string} categoryId - 表示するカテゴリのID (例: 'category-favorites', 'category-greeting')
  */
 function showCategory(categoryId) {
@@ -921,21 +929,26 @@ function showCategory(categoryId) {
     }
 
     // 2. コンテンツの生成/ロード (メモカテゴリ以外)
-    if (categoryId !== 'category-favorites')
-    {
+    if (categoryId !== 'category-favorites') {
         const targetSection = document.getElementById(categoryId);
         const categoryData = VOICE_DATA.find(c => c.id === categoryId);
 
         if (targetSection && categoryData) {
-            // ... (遅延レンダリングロジックは変更なし) ...
+            // ★遅延レンダリングの修正★: セクションが空の場合のみコンテンツを生成・追加する
+            if (targetSection.children.length === 0) {
+                const sectionContent = createCategorySectionContent(categoryData);
+                targetSection.appendChild(sectionContent);
 
-            // ★修正: 遅延ロードの実行（Promiseは返すが、結果を待たずにUI描画を継続）
-            // これにより、UIの描画はブロックされない
+                // 初回生成時に星の状態を更新
+                updateAllVoiceButtonStates();
+            }
+
+            // ★遅延ロードの実行（非同期で音声ファイルの準備を開始）
             preloadCategoryVoices(categoryId);
         }
     }
 
-    // 3. 表示の切り替え (最後に実行)
+    // 3. 表示の切り替え
     document.querySelectorAll('.category-section').forEach(section => {
         section.classList.add('hidden');
     });
@@ -946,13 +959,11 @@ function showCategory(categoryId) {
     }
 }
 
-
 // =================================================================
 // 6. 音声再生ロジック
 // =================================================================
 /**
  * ボイスボタンがクリックされた時の処理
- * (再生遅延と音の途切れを解決するため、プールからクローンして再生)
  * @param {string} soundPath - ボイスのユニークID (folder/file.wav)
  */
 function handleVoiceButtonClick(soundPath) {
@@ -960,16 +971,16 @@ function handleVoiceButtonClick(soundPath) {
     const fullPath = 'sounds/' + soundPath;
 
     if (!masterAudio) {
-        // プールにない場合は、その場で Audio インスタンスを作成して再生を試みる
+        // プールにない場合は、その場で Audio インスタンスを作成して再生を試みる（フォールバック）
         console.warn(`[Warning] Audio not in pool, playing new Audio for: ${soundPath}`);
         playAudioDirectly(fullPath);
         return;
     }
 
-    // 1. プールからクローンして再生を試みる
+    // 1. プールからクローンして再生を試みる (同時再生可能)
     const audioToPlay = masterAudio.cloneNode(true);
 
-    // 現在の再生位置をリセット（重要：最初から鳴らすため）
+    // 現在の再生位置をリセット
     audioToPlay.currentTime = 0;
 
     audioToPlay.play().catch(error => {
@@ -978,7 +989,6 @@ function handleVoiceButtonClick(soundPath) {
              console.warn(`[Warning] Auto-play blocked. Retrying with a new Audio instance in the same click event.`);
 
              // ユーザー操作のコンテキスト内で、新しいAudioインスタンスを生成し直して再生を試みる
-             // これで多くのモバイルブラウザでブロックが解除されます。
              playAudioDirectly(fullPath);
 
         } else {
@@ -993,15 +1003,13 @@ function handleVoiceButtonClick(soundPath) {
 }
 
 /**
- * (フォールバック用) 新しい Audio インスタンスを作成して再生
+ * 新しい Audio インスタンスを作成して再生する (フォールバック & ブロック解除用)
  * @param {string} fullPath - 音声ファイルのフルパス
  */
 function playAudioDirectly(fullPath) {
-    // ユーザー操作 (クリック) のコンテキスト内でインスタンスを生成
     const audio = new Audio(fullPath);
 
     audio.play().catch(error => {
-        // ログに残す
         console.error(`[Error] Direct play failed for: ${fullPath}`, error);
     });
 
@@ -1014,13 +1022,12 @@ function playAudioDirectly(fullPath) {
 // =================================================================
 // 7. 初期化 (DOMContentLoadedイベントハンドラ)
 // =================================================================
-
 // DOMのロード完了を待ってから実行
 document.addEventListener('DOMContentLoaded', () => {
     loadFavoritesFromLocalStorage(); // 最初にローカルストレージからメモを読み込む
     generateAppStructure(VOICE_DATA);
 
-
     // 初期化時に全てのボタンの星の状態を同期
+    // (注: 初回はメモカテゴリ以外はボタンがないが、showCategoryで生成されるときに更新されるため問題なし)
     updateAllVoiceButtonStates();
 });
