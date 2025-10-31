@@ -323,9 +323,12 @@ let draggedItem = null;
     // 新しい位置に要素を挿入
     favorites.splice(insertionIndex, 0, movedItem);
 
-    // UIを再レンダリング
+    // UIを再レンダリング (メモカテゴリの再描画)
     updateFavoriteCategory(); 
+    // 現在の表示をメモカテゴリに切り替える
     showCategory('category-favorites'); 
+    // 全てのボタンの星アイコンの状態を更新 (追加: ここで全ボタンの状態を更新することで、星の非表示問題を解決)
+    updateAllVoiceButtonStates(); 
 
     // ローカルストレージに保存
     saveFavoritesToLocalStorage();
