@@ -343,9 +343,10 @@ function removeFavorite(categoryId, file) {
  * お気に入りリストをクリアします。
  */
 function clearFavorites() {
-    if (confirm('メモ内の全てのボイスを削除してもよろしいですか？')) {
+    // NOTE: confirm() は非推奨ですが、ここではデモ用途として使用を維持します。
+    if (confirm('メモ内の全てのボイスを削除してもよろしいですか？')) { 
         localStorage.removeItem(FAVORITES_KEY);
-        // キャッシュもクリアする
+        // Web Audio APIのキャッシュもクリアする
         audioCache.clear(); 
         renderFavorites();
         showMessage('メモをすべて削除しました。', 'success');
@@ -641,34 +642,63 @@ function saveNewFavoriteOrder() {
 
 
 // =================================================================
-// 7. 音声再生機能 (Web Audio APIを使用)
+// 7. 音声再生機能 (Web Audio APIを使用) とプリロード
 // =================================================================
+
+/**
+ * 音声ファイルを取得し、デコードして、キャッシュに保存します。（プリロードのコア機能）
+ * @param {string} url - 音声ファイルのURL
+ * @param {number} retries - 残りのリトライ回数
+ * @returns {Promise<AudioBuffer>} デコードされた音声データ (AudioBuffer)
+ */
+async function loadAudioToCache(url, retries = 3) {
+    // 1. キャッシュチェック
+    if (audioCache.has(url)) {
+        return audioCache.get(url);
+    }
+
+    if (!audioContext) {
+        throw new Error("AudioContext is not initialized.");
+    }
+    
+    try {
+        // 2. 音声データの取得
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+
+        // 3. デコード (Web Audio APIのコア機能)
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        audioCache.set(url, audioBuffer); // キャッシュに保存
+        return audioBuffer;
+
+    } catch (error) {
+        // エラーハンドリングと指数バックオフ
+        if (retries > 0) {
+            const delay = Math.pow(2, 3 - retries) * 500;
+            console.warn(`[Retry] Failed to load/decode audio ${url}. Retrying in ${delay}ms...`, error.message);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            // 再帰呼び出しでリトライ
+            return loadAudioToCache(url, retries - 1); 
+        } else {
+            console.error(`[Error] Failed to load audio after all retries: ${url}`, error);
+            throw new Error(`Failed to load audio: ${url}`);
+        }
+    }
+}
 
 /**
  * ボイスを再生します。
  * @param {string} fullPath - 再生する音声ファイルのフルパス
  */
-function voicePlay(fullPath) {
-    // ユーザー操作による初期化/再開を確実にする
+async function voicePlay(fullPath) {
+    // ユーザー操作によるAudioContextの再開を確実にする
     initAudioContext(); 
-    playAudioWithRetry(fullPath);
-}
-
-/**
- * 指数バックオフ付きのFetch関数 (Web Audio API再生)
- * @param {string} url - 再生する音声ファイルのURL
- * @param {number} retries - 残りのリトライ回数
- */
-async function playAudioWithRetry(url, retries = 3) {
-    // AudioContextが利用可能かチェック
-    if (!audioContext) {
-        console.warn(`[Warning] AudioContext is not initialized yet. Path: ${url}.`);
-        return;
-    }
-
+    
     // Contextが'suspended'状態なら、ユーザー操作を待つ
-    if (audioContext.state !== 'running') {
-        console.warn(`[Warning] AudioContext is suspended. Trying to resume. Path: ${url}. (User interaction required)`);
+    if (audioContext && audioContext.state !== 'running') {
         await audioContext.resume().catch(err => {
             console.error("Failed to resume AudioContext on playback attempt:", err);
             return; // 再開できなければ終了
@@ -676,44 +706,51 @@ async function playAudioWithRetry(url, retries = 3) {
     }
 
     try {
-        let audioBuffer;
+        // データをロード（キャッシュにあれば即時返却）
+        const audioBuffer = await loadAudioToCache(fullPath);
 
-        // 1. キャッシュチェック
-        if (audioCache.has(url)) {
-            audioBuffer = audioCache.get(url);
-        } else {
-            // 2. 音声データの取得とデコード
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const arrayBuffer = await response.arrayBuffer();
-
-            // 3. デコード (Web Audio APIのコア機能)
-            audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-            audioCache.set(url, audioBuffer); // キャッシュに保存
-        }
-
-        // 4. Source Nodeの作成と再生
+        // Source Nodeの作成と再生
         const source = audioContext.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(audioContext.destination);
         source.start(0); // 0秒から再生開始
 
-        console.log(`[Success] Web Audio requested: ${url}`);
-
+        console.log(`[Success] Web Audio requested: ${fullPath}`);
     } catch (error) {
-        // エラーハンドリング
-        if (retries > 0) {
-            const delay = Math.pow(2, 3 - retries) * 500;
-            console.warn(`[Retry] Failed to load/decode audio ${url}. Retrying in ${delay}ms...`, error.message);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            playAudioWithRetry(url, retries - 1);
-        } else {
-            console.error(`[Error] Failed to load audio after all retries: ${url}`, error);
-            showMessage('音声ファイルの読み込みに失敗しました。', 'error');
-        }
+        console.error(`[Error] Playback failed: ${fullPath}`, error);
+        showMessage('音声ファイルの再生に失敗しました。', 'error');
     }
+}
+
+/**
+ * 全てのボイスをプリロードし、キャッシュに保存します。
+ */
+async function preloadAllVoices() {
+    console.log("Preloading all voices...");
+    
+    // プリロードのためにAudioContextを初期化
+    initAudioContext(); 
+    if (!audioContext) return;
+
+    // 全てのボイスパスをリストアップ
+    const allVoices = VOICE_DATA.flatMap(cat => 
+        cat.voices.map(voice => ({
+            path: `${VOICE_BASE_PATH}/${cat.folder}/${voice.file}`,
+            text: voice.text
+        }))
+    );
+    
+    // 全てのロード処理を並行して実行
+    const preloadPromises = allVoices.map(voice => 
+        loadAudioToCache(voice.path).catch(err => {
+            // 失敗しても他のプリロードは続行させる
+            console.error(`Preload failed for ${voice.text}:`, err.message);
+            return null; 
+        })
+    );
+
+    await Promise.all(preloadPromises);
+    console.log(`Preloading finished. ${audioCache.size} voices are cached.`);
 }
 
 
@@ -723,8 +760,8 @@ async function playAudioWithRetry(url, retries = 3) {
 
 // DOMのロード完了後に初期化処理を実行
 document.addEventListener('DOMContentLoaded', () => {
-    // 最初のユーザー操作（DOMContentLoaded時点ではまだ発生していないが、関数を定義しておく）
-    initAudioContext(); 
+    // プリロードはユーザー操作を待たずに実行可能
+    preloadAllVoices(); 
     renderCategories();
 
     // メッセージコンテナの作成
@@ -732,4 +769,3 @@ document.addEventListener('DOMContentLoaded', () => {
     messageContainer.id = 'message-container';
     document.body.appendChild(messageContainer);
 });
-
