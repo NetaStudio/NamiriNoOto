@@ -267,9 +267,11 @@ let draggedItem = null;
 
     // ドラッグオーバーの視覚フィードバックを全てクリア
     document.querySelectorAll('.voice-button').forEach(item => {
+        // ドラッグオーバーのクラスを削除
         item.classList.remove('drag-over-top', 'drag-over-bottom');
     });
     
+    // ドロップターゲット要素
     const targetItem = e.target.closest('.voice-button');
     
     const resetDragState = () => {
@@ -297,28 +299,26 @@ let draggedItem = null;
         return; 
     }
 
-    // 移動元要素を配列から取り出す
+    // 移動元要素を配列から一時的に取り除く
     const movedItem = favorites.splice(oldIndex, 1)[0];
     
-    // 挿入するインデックスを計算
-    let insertionIndex;
-
-    const rect = targetItem.getBoundingClientRect();
-    const targetMiddleY = rect.top + rect.height / 2;
-    
-    if (e.clientY > targetMiddleY) {
-        // ターゲットの下半分にドロップした場合 (ターゲットの直後に挿入)
-        insertionIndex = (oldIndex < newIndex) ? newIndex : newIndex + 1;
-    } else {
-        // ターゲットの上半分にドロップした場合 (ターゲットの直前に挿入)
-        insertionIndex = (oldIndex < newIndex) ? newIndex : newIndex;
-    }
+    // =================================================================
+    // ★★★★ 修正した挿入インデックス計算ロジック (上下判定なし) ★★★★
+    // ターゲットの場所に移動する要素を挿入する（ターゲットの直前に挿入される）
+    // splice(newIndex, 0, movedItem) とすると、
+    // movedItem は newIndex の要素の前に挿入されるため、純粋な「入れ替え」動作となる
+    // =================================================================
+    let insertionIndex = newIndex;
 
     // 配列の境界チェックと調整
     if (insertionIndex > favorites.length) {
         insertionIndex = favorites.length;
+    } else if (insertionIndex < 0) {
+        insertionIndex = 0;
     }
-
+    // =================================================================
+    // ★★★★ 修正終わり ★★★★
+    // =================================================================
 
     // 新しい位置に要素を挿入
     favorites.splice(insertionIndex, 0, movedItem);
@@ -333,7 +333,6 @@ let draggedItem = null;
     showCategory('category-favorites'); 
 
     // 3. 全てのボタンの星アイコンの状態を更新 (再描画されたDOM要素に対して行う)
-    // これにより、メモカテゴリの新しいボタンにも星が正しく表示されます。
     updateAllVoiceButtonStates(); 
     
     // 状態をリセット
@@ -411,7 +410,6 @@ function toggleFavorite(voiceId, event) {
     }
 
     // 3. 全てのカテゴリボタンの状態を更新 (再描画されたDOM要素に対して行う)
-    // これにより、メモカテゴリの新しいボタンと通常カテゴリのボタン全てが同期されます。
     updateAllVoiceButtonStates();
 }
 
@@ -480,23 +478,19 @@ function getFavoriteVoices() {
  * メモリストをクリアする
  */
 function clearFavorites() {
-    const confirmed = window.confirm("本当にメモリストを全て削除しますか？");
-    if (!confirmed) {
-        return;
-    }
-
-    favorites = [];
-    saveFavoritesToLocalStorage();
-    
-    // 順序を入れ替えてから状態を更新
-    updateFavoriteCategory();
-    updateAllVoiceButtonStates();
-    
-    const activeLink = document.querySelector('.category-link.selected');
-    if (activeLink && activeLink.getAttribute('data-category-id') === 'category-favorites') {
-        // メモカテゴリが表示中なら、空の状態で再表示
-        showCategory('category-favorites');
-    }
+    // カスタムモーダルに置き換え
+    showCustomConfirm("本当にメモリストを全て削除しますか？", () => {
+        favorites = [];
+        saveFavoritesToLocalStorage();
+        
+        updateFavoriteCategory();
+        updateAllVoiceButtonStates();
+        
+        const activeLink = document.querySelector('.category-link.selected');
+        if (activeLink && activeLink.getAttribute('data-category-id') === 'category-favorites') {
+            showCategory('category-favorites');
+        }
+    });
 }
 
 
@@ -719,6 +713,38 @@ function generateAppStructure(data) {
         }
     });
 
+    // --- Drag Enter/Over/Leave (視覚フィードバックのロジックは削除し、dropのみに集中) ---
+    grid.addEventListener('dragover', (e) => {
+        e.preventDefault(); // ドロップを許可するために必要
+        e.dataTransfer.dropEffect = 'move';
+        
+        // --- 視覚フィードバックの制御 ---
+        // ここで、上半分/下半分の判定を削除し、ターゲットボタン全体が対象であることを維持します。
+        const targetItem = e.target.closest('.voice-button');
+
+        // 全てのアイテムから強調表示を削除
+        grid.querySelectorAll('.voice-button').forEach(item => {
+            item.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+        
+        // ターゲットアイテムにのみ強調表示を追加
+        if (targetItem && targetItem !== draggedItem) {
+            // 上下どちらでも同じ効果を出すために drag-over-top を使用
+            targetItem.classList.add('drag-over-top');
+        }
+    });
+
+    grid.addEventListener('dragleave', (e) => {
+        // grid外に出た場合のみクリア
+        if (e.relatedTarget && e.relatedTarget.closest('#favorites-grid') === grid) {
+            return;
+        }
+        grid.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
+            el.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+    });
+
+
     // --- Drag End ---
     grid.addEventListener('dragend', (e) => {
         // ドラッグが終了したら、元のスタイルと状態をリセット
@@ -731,252 +757,200 @@ function generateAppStructure(data) {
         draggedItem = null;
     });
 
-    // --- Drag Over (視覚フィードバックとドロップ許可) ---
-    grid.addEventListener('dragover', (e) => {
-        e.preventDefault(); 
-        
-        const target = e.target.closest('.voice-button');
-        const targetGrid = e.target.closest('#favorites-grid');
-
-        if (targetGrid) {
-            // 全てのフィードバックをクリア
-            targetGrid.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
-                el.classList.remove('drag-over-top', 'drag-over-bottom');
-            });
-        }
-
-        if (draggedItem && target && draggedItem !== target) {
-            // ドロップエフェクトを設定
-            e.dataTransfer.dropEffect = 'move';
-            
-            // ドロップ位置の判定と視覚フィードバックの追加
-            const rect = target.getBoundingClientRect();
-            const targetMiddleY = rect.top + rect.height / 2;
-            
-            if (e.clientY > targetMiddleY) {
-                target.classList.add('drag-over-bottom'); 
-            } else {
-                target.classList.add('drag-over-top'); 
-            }
-        }
-    });
-
     // --- Drop ---
-    grid.addEventListener('drop', (e) => {
-        e.preventDefault();
-        handleDrop(e); 
-    });
+    grid.addEventListener('drop', handleDrop);
 }
 
 
 // =================================================================
-// 6. UI操作ロジック
+// 6. 汎用機能・表示切り替え
 // =================================================================
 
 /**
- * 表示するカテゴリを切り替える
+ * カテゴリセクションの表示を切り替える
+ * @param {string} categoryId - 表示するカテゴリのID
  */
 function showCategory(categoryId) {
-    // 全てのセクションを非表示
+    // 全てのカテゴリセクションを非表示にする
     document.querySelectorAll('.category-section').forEach(section => {
         section.classList.add('hidden');
     });
 
-    const targetSection = document.getElementById(categoryId);
-    if (targetSection) {
-        targetSection.classList.remove('hidden');
+    // 指定されたカテゴリを表示する
+    const activeSection = document.getElementById(categoryId);
+    if (activeSection) {
+        activeSection.classList.remove('hidden');
     }
 
-    // 全てのリンクから選択状態を解除
+    // ナビゲーションリンクの選択状態を更新する
     document.querySelectorAll('.category-link').forEach(link => {
-        link.classList.remove('selected', 'bg-blue-50', 'font-semibold');
+        link.classList.remove('selected', 'bg-blue-100', 'font-semibold');
+        link.classList.add('text-gray-700', 'hover:bg-gray-100');
+
+        if (link.getAttribute('data-category-id') === categoryId) {
+            link.classList.add('selected', 'bg-blue-100', 'font-semibold');
+            link.classList.remove('text-gray-700', 'hover:bg-gray-100');
+        }
     });
-
-    // アクティブなリンクを選択状態にする
-    const activeLink = document.querySelector(`.category-link[data-category-id="${categoryId}"]`);
-    if (activeLink) {
-        activeLink.classList.add('selected', 'bg-blue-50', 'font-semibold');
-    }
 }
 
-
-// =================================================================
-// 7. 音声再生（Web Audio API版 - 低遅延再生）
-// =================================================================
-
 /**
- * ボイスボタンがクリックされた時の処理
- * @param {string} soundPath - ボイスのユニークID (folder/file.wav)
+ * 画面中央にカスタム確認ダイアログを表示する
+ * @param {string} message - 表示するメッセージ
+ * @param {function} onConfirm - 「はい」がクリックされたときのコールバック
  */
-function handleVoiceButtonClick(soundPath) {
-    // AudioContextが未初期化なら初期化を試みる
-    if (!audioContext) {
-        initializeAudioContext();
-    }
+function showCustomConfirm(message, onConfirm) {
+    const modal = document.getElementById('custom-modal');
+    const modalMessage = document.getElementById('modal-message');
+    const confirmBtn = document.getElementById('modal-confirm-btn');
+    const cancelBtn = document.getElementById('modal-cancel-btn');
+
+    // モーダルの表示設定
+    modal.classList.remove('hidden');
+    modalMessage.textContent = message;
+
+    // イベントリスナーをクリア
+    confirmBtn.onclick = null;
+    cancelBtn.onclick = null;
+
+    // 「はい」ボタンの処理
+    confirmBtn.onclick = () => {
+        modal.classList.add('hidden');
+        onConfirm();
+    };
+
+    // 「いいえ」ボタンの処理
+    cancelBtn.onclick = () => {
+        modal.classList.add('hidden');
+    };
     
-    const fullPath = 'sounds/' + soundPath;
-    playAudioBuffer(fullPath);
+    // モーダルの外側をクリックしても閉じられるようにする
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            modal.classList.add('hidden');
+        }
+    };
 }
 
 /**
- * 事前ロードされたAudioBufferを再生する
- * @param {string} url - AudioBufferのキー (full path)
+ * AudioContextをユーザー操作に基づいて初期化（アンロック）する
  */
-function playAudioBuffer(url) {
-    if (!audioContext) {
-        console.error("[Error] AudioContext is not initialized.");
+function unlockAudioContext(voiceId) {
+    if (isAudioContextUnlocked) {
         return;
     }
 
-    // AudioContextが停止している場合、再開を試みる (モバイル対策)
-    if (audioContext.state === 'suspended') {
-        audioContext.resume().then(() => {
-            console.log("[Success] AudioContext resumed.");
-            // 再開後に改めて再生処理を行う
-            _performPlayback(url);
-        }).catch(e => {
-            console.error("[Error] Failed to resume AudioContext:", e);
-        });
-    } else {
-        _performPlayback(url);
-    }
-}
-
-/**
- * 実際の再生ロジック（_performPlaybackで即座に再生することで低遅延を実現）
- * @param {string} url - AudioBufferのキー (full path)
- */
-function _performPlayback(url) {
-    const buffer = audioBufferMap.get(url);
-
-    if (buffer && audioContext && audioContext.state === 'running') {
-        // 1. AudioBufferSourceNodeを作成
-        const source = audioContext.createBufferSource();
-        // 2. ロード済みのAudioBufferをセット
-        source.buffer = buffer;
-        // 3. 出力先を設定
-        source.connect(audioContext.destination);
-        // 4. 即座に再生開始
-        source.start(0); 
-        
-        console.log(`[Success] AudioBuffer played: ${url}`);
-    } else if (!buffer) {
-        console.warn(`[Warning] AudioBuffer not yet loaded or failed to load: ${url}`);
-        // ロードが完了していない場合は、ブラウザ標準のAudioを使って代替再生を試みる（遅延の可能性あり）
-        try {
-            const tempAudio = new Audio(url);
-            tempAudio.play().catch(e => console.warn("Fallback audio play failed:", e));
-        } catch (e) {
-            console.error("Failed to fallback play audio:", e);
-        }
-    } else {
-        console.warn(`[Warning] AudioContext state is not 'running': ${audioContext.state}`);
-    }
-}
-
-
-// -----------------------------------------------------------------
-// 8. AudioContextとバッファの初期化処理
-// -----------------------------------------------------------------
-
-/**
- * AudioContextを初期化し、モバイルでの制限解除を試みる
- */
-function initializeAudioContext() {
-    if (!audioContext) {
-        // 標準的なAudioContextを生成
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        // サンプルレートを標準的な44100Hzに指定
-        audioContext = new AudioContext({ sampleRate: 44100 });
-        console.log("[Init] AudioContext created.");
+    // Web Audio APIの利用可能性をチェック
+    if (!window.AudioContext && !window.webkitAudioContext) {
+        console.error("Web Audio API is not supported in this browser.");
+        return;
     }
 
-    // AudioContextが停止している状態（モバイルでよくある初期状態）であれば、
-    // ユーザー操作による再開（アンロック）リスナーを設定する
-    if (audioContext.state === 'suspended' && !isAudioContextUnlocked) {
-        console.log("[Init] AudioContext is suspended. Setting up resume listener.");
-        
-        const resumeContext = () => {
-            if (audioContext && audioContext.state === 'suspended') {
-                audioContext.resume().then(() => {
-                    console.log("[Success] AudioContext resumed (unlocked).");
-                    isAudioContextUnlocked = true;
-                    // アンロック後はリスナーを解除
-                    document.removeEventListener('click', resumeContext);
-                    document.removeEventListener('touchend', resumeContext);
-                }).catch(e => {
-                    console.error("[Error] Failed to resume AudioContext:", e);
-                });
-            }
-        };
-
-        // DOMContentLoaded後、最初のクリック/タッチでアンロックを試みる
-        document.addEventListener('click', resumeContext, { once: true });
-        document.addEventListener('touchend', resumeContext, { once: true });
-    }
-}
-
-
-/**
- * 全ての音声ファイルをWeb Audio APIのAudioBufferとして事前にロードする
- */
-async function preloadAllAudioBuffers() {
-    const allVoicePaths = [];
-    VOICE_DATA.forEach(category => {
-        category.voices.forEach(voice => {
-            allVoicePaths.push('sounds/' + category.folder + '/' + voice.file);
-        });
-    });
-
-    // AudioContextが初期化されていない場合は、ここで初期化を試みる
-    if (!audioContext) {
-        initializeAudioContext();
-    }
-
-    const loadingPromises = allVoicePaths.map(async (fullPath) => {
-        try {
-            // 1. ArrayBufferとして音声ファイルをフェッチ
-            const response = await fetch(fullPath);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const arrayBuffer = await response.arrayBuffer();
-
-            // 2. AudioContextでデコード（非同期処理）
-            // audioContextが存在しない可能性があるためチェック
-            if (!audioContext) {
-                 console.error("[Preload Error] AudioContext is null during decoding.");
-                 return;
-            }
-            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-            
-            // 3. マップに保存
-            audioBufferMap.set(fullPath, audioBuffer);
-            // console.log(`[Preload] Loaded: ${fullPath}`);
-        } catch (error) {
-            console.error(`[Preload Error] Failed to load or decode audio: ${fullPath}`, error);
-        }
-    });
+    // AudioContextの初期化
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
     
-    // 全てのリソースのロードが完了するのを待つ
-    await Promise.all(loadingPromises);
-    console.log(`[Init] All ${audioBufferMap.size} audio buffers preloaded.`);
+    // iOS/Safariなどの制約解除のための処理
+    const buffer = audioContext.createBuffer(1, 1, 22050);
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioContext.destination);
+    source.start(0);
+    source.stop(0);
+
+    // ユーザー操作があったため、フラグを設定
+    isAudioContextUnlocked = true;
+    console.log("[Info] AudioContext unlocked successfully.");
+    
+    // 初めてのクリックでAudioContextをアンロックしたら、本来の音声再生処理を改めて実行
+    // これにより、アンロックのために音声再生がスキップされることを防ぐ
+    playVoice(voiceId);
+}
+
+// =================================================================
+// 7. 音声再生ロジック
+// =================================================================
+
+/**
+ * 指定されたボイスIDの音声ファイルを再生する
+ * @param {string} voiceId - 再生するボイスのユニークID (例: 01_greeting/file.mp3)
+ */
+function playVoice(voiceId) {
+    if (!isAudioContextUnlocked) {
+        unlockAudioContext(voiceId);
+        return; // 初回はアンロック処理のみを行い、再実行はunlockAudioContext内で行う
+    }
+    
+    const BASE_URL = 'https://raw.githubusercontent.com/shiosoranami-studio/shiosoranami-sound-assets/main/voice';
+    const fullPath = `${BASE_URL}/${voiceId}`;
+    
+    // Web Audio APIを使わず、シンプルなHTML5 Audioで再生する (ロードの複雑さを避けるため)
+    playAudioWithRetry(fullPath);
+}
+
+/**
+ * 指数バックオフ付きのFetch関数 (音声再生)
+ * @param {string} url - 再生する音声ファイルのURL
+ * @param {number} retries - 残りのリトライ回数
+ */
+async function playAudioWithRetry(url, retries = 3) {
+    try {
+        // 現在再生中の音声があれば停止させるための処理
+        const existingAudio = document.getElementById('current-audio-player');
+        if (existingAudio) {
+            existingAudio.pause();
+            existingAudio.remove();
+        }
+
+        const audio = new Audio(url);
+        audio.id = 'current-audio-player'; // 識別用のIDを設定
+        audio.preload = 'auto'; // 事前ロードを指示
+
+        // ロード完了を待つ（ネットワークエラーをここで捕捉できる）
+        await new Promise((resolve, reject) => {
+            audio.addEventListener('canplaythrough', resolve, { once: true });
+            audio.addEventListener('error', reject, { once: true });
+            // タイムアウトも設定
+            setTimeout(() => reject(new Error('Audio load timed out')), 5000); 
+            audio.load();
+        });
+
+        audio.currentTime = 0;
+        await audio.play();
+        console.log(`[Success] Audio requested: ${url}`);
+
+        // 再生終了時に要素を削除
+        audio.addEventListener('ended', () => {
+            audio.remove();
+        }, { once: true });
+
+    } catch (error) {
+        if (error.name === "NotAllowedError" || error.name === "AbortError" || error.message.includes("timed out")) {
+            console.warn(`[Warning] Audio play restricted or Load timeout. Path: ${url}. (User interaction required or bad network)`);
+        } else if (retries > 0) {
+            const delay = Math.pow(2, 3 - retries) * 500;
+            console.warn(`[Retry] Failed to load audio ${url}. Retrying in ${delay}ms... (Error: ${error.message})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            playAudioWithRetry(url, retries - 1);
+        } else {
+            console.error(`[Error] Failed to load audio after all retries: ${url}`, error);
+        }
+    }
 }
 
 
 // =================================================================
-// 9. 初期化 (DOMContentLoadedイベントハンドラ)
+// 8. 初期化 (DOMContentLoadedイベントハンドラ)
 // =================================================================
 
-// DOMのロード完了を待ってから実行
+// DOMのロード完了後に実行
 document.addEventListener('DOMContentLoaded', () => {
-    // 最初にAudioContextの初期化とアンロック設定を行う
-    initializeAudioContext();
-    // 全ての音声ファイルを非同期でロード開始
-    preloadAllAudioBuffers();
+    // 1. メモデータをローカルストレージから読み込む
+    loadFavoritesFromLocalStorage();
 
-    loadFavoritesFromLocalStorage(); 
+    // 2. アプリのUI構造を生成し、初期カテゴリを表示する
     generateAppStructure(VOICE_DATA);
-    // 初回ロード完了後に全てのボタンの状態を同期
+
+    // 3. 全てのボイスボタンの★/☆マークの状態を更新する
+    // (generateAppStructureでボタンがDOMに追加された後に実行する必要がある)
     updateAllVoiceButtonStates();
 });
