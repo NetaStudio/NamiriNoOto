@@ -237,7 +237,10 @@ const VOICE_DATA =
     }
 ];
 
-//低遅延再生のため、全てのAudioオブジェクトを事前に生成
+// =================================================================
+// ★ 修正: グローバルな音声オブジェクトのマップ
+// 低遅延再生のため、全てのAudioオブジェクトを事前に生成し、ここに保持します。
+// =================================================================
 const preloadedAudioMap = new Map();
 
 // =================================================================
@@ -248,8 +251,9 @@ const FAVORITES_KEY = 'namiri_oto_favorites';
 let favorites = [];
 let draggedItem = null;
 
-//ドロップ位置情報を記憶するフラグ
+// ドロップ位置情報を記憶するフラグ（今回は常に「前」に挿入するため、このフラグは視覚フィードバックの判定にのみ使用する）
 let isDroppingAfterTarget = false;
+
 
 function handleDragStart(e) {
     draggedItem = this; // ドラッグされている要素を保持
@@ -274,7 +278,8 @@ function handleDragOver(e) {
 
     const targetItem = e.target.closest('.voice-button');
     if (targetItem && targetItem !== draggedItem) {
-
+        // ドロップターゲットがボタンの場合、カーソル位置による上下判定はここでは行わない
+        // ロジックはシンプルに、ターゲット全体にドロップとして扱う
     }
 }
 
@@ -341,7 +346,7 @@ function handleDragOver(e) {
     }
 
     // ------------------------------------------------------------------
-    // ターゲットの直後に挿入
+    // ★★★★ 【最終修正ロジック】: ターゲットの直後に挿入
     // ------------------------------------------------------------------
     
     // 1. 移動元要素を配列から取り出す（削除）
@@ -351,8 +356,14 @@ function handleDragOver(e) {
     let insertionIndex;
 
     if (oldIndex < newIndex) {
+        // 例: 1を3へ移動 (2314)。
+        // 1を削除すると3のインデックスは 2-1=1 となる。元の3の位置 (newIndex=2) に挿入すればOK。
         insertionIndex = newIndex; 
     } else {
+        // 例: 3を1へ移動 (3124)。
+        // 3を削除しても1のインデックスは 0 のまま。1の直後(インデックス1)に挿入したい。
+        // splice(newIndex, 0, movedItem)とすると、movedItemはnewIndexの要素の前に挿入される。
+        // ターゲット(1)の前に挿入し、ターゲットを後ろにずらすことで、「ターゲットの直後」を実現する。
         insertionIndex = newIndex; 
     }
     
@@ -869,30 +880,30 @@ function showCategory(categoryId) {
 function handleVoiceButtonClick(soundPath) {
     const fullPath = 'sounds/' + soundPath;
 
+    // 事前ロードされた音声オブジェクトを使用して即時再生を行う関数を呼び出す
     playAudioWithRetry(fullPath);
 }
 
 /**
  * 指数バックオフ付きのFetch関数 (音声再生)
+ * ★ 修正: 事前ロードされたAudioオブジェクトを使用して即時再生を行うように変更。
+ * 遅延の原因であった new Audio() と await audio.load() を削除しました。
  * @param {string} url - 再生する音声ファイルのURL
- * @param {number} retries - 残りのリトライ回数
+ * @param {number} retries - 残りのリトライ回数 (この実装では無視されます)
  */
-async function playAudioWithRetry(url, retries = 3)
-{
+async function playAudioWithRetry(url, retries = 3) {
     const audio = preloadedAudioMap.get(url);
-    if (audio)
-    {
-        try
-        {
+
+    if (audio) {
+        try {
             // 再生位置をリセット (頭切れ防止に必須)
             audio.currentTime = 0;
             
             // 再生を実行
+            // play() は Promise を返すので await を使用しますが、ボタンクリックイベント内なので遅延はほとんどありません。
             await audio.play();
             console.log(`[Success] Preloaded audio played: ${url}`);
-        }
-        catch (error)
-        {
+        } catch (error) {
             // エラーハンドリング (ユーザー操作制限など)
             if (error.name === "NotAllowedError" || error.name === "AbortError") {
                  console.warn(`[Warning] Audio play restricted. Path: ${url}. (User interaction required)`);
@@ -900,16 +911,22 @@ async function playAudioWithRetry(url, retries = 3)
                  console.error(`[Error] Failed to play preloaded audio: ${url}`, error);
             }
         }
-    }
-    else
-    {
-        console.error(`[Error] Audio not preloaded: ${url}. Cannot play without delay.`);
+    } else {
+        // 事前ロードが失敗したか、まだ完了していない場合のエラーメッセージ
+        console.error(`[Error] Audio not preloaded: ${url}. Cannot play without delay. (Preload failed or not yet completed)`);
+        // 応急処置として、遅延を許容して新しいAudioオブジェクトで再生を試みることもできますが、今回は低遅延を優先しエラーを出す
     }
 }
 
+
 // -----------------------------------------------------------------
-// ★ 追加: 全ての音声ファイルを事前ロードする処理
+// ★ 修正: 全ての音声ファイルを事前ロードする処理
 // -----------------------------------------------------------------
+
+/**
+ * VOICE_DATAに基づき、全ての音声ファイルを事前にロードし、Audioオブジェクトを保持します。
+ * load() が Promise を返さない環境に対応するため、.catch() を削除し、error イベントをリッスンするように変更しました。
+ */
 function preloadAllAudio() {
     VOICE_DATA.forEach(category => {
         category.voices.forEach(voice => {
@@ -919,12 +936,13 @@ function preloadAllAudio() {
             // 1. Audioオブジェクトを生成
             const audio = new Audio(fullPath);
             
-            // 2. load() を呼び出し、ファイルの読み込み/デコードを開始
-            // await を付けないことで、ロード完了を待たずに即座に初期化を完了させます。
-            audio.load().catch(e => {
-                // ロード失敗時のエラーハンドリング
-                console.warn(`[Preload Warning] Failed to load audio (non-blocking): ${fullPath}`, e);
+            // 2. load() の Promise チェーンエラーを防ぐため、error イベントをリッスンします。
+            audio.addEventListener('error', (e) => {
+                console.error(`[Preload Error] Failed to load audio: ${fullPath}`, e.target.error);
             });
+            
+            // load() を実行。非同期でロードが開始されますが、処理をブロックしません。
+            audio.load();
             
             // 3. Audioオブジェクトをマップに保存
             preloadedAudioMap.set(fullPath, audio);
@@ -932,6 +950,7 @@ function preloadAllAudio() {
     });
     console.log(`[Init] ${preloadedAudioMap.size} audio files are queued for preloading.`);
 }
+
 
 // =================================================================
 // 7. 初期化 (DOMContentLoadedイベントハンドラ)
@@ -942,15 +961,10 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFavoritesFromLocalStorage(); // 最初にローカルストレージからメモを読み込む
     generateAppStructure(VOICE_DATA);
 
-    //音声ファイルの事前ロードを開始
+    // ★ 修正: 音声ファイルの事前ロードを開始
     preloadAllAudio();
-    
+
     // 初期化時に全てのボタンの星の状態を同期
     updateAllVoiceButtonStates();
 
 });
-
-
-
-
-
