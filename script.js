@@ -237,6 +237,9 @@ const VOICE_DATA =
     }
 ];
 
+//低遅延再生のため、全てのAudioオブジェクトを事前に生成
+const preloadedAudioMap = new Map();
+
 // =================================================================
 // 2. メモ機能の管理 (Arrayに変更し、順序を保持)
 // =================================================================
@@ -245,9 +248,8 @@ const FAVORITES_KEY = 'namiri_oto_favorites';
 let favorites = [];
 let draggedItem = null;
 
-// ドロップ位置情報を記憶するフラグ（今回は常に「前」に挿入するため、このフラグは視覚フィードバックの判定にのみ使用する）
+//ドロップ位置情報を記憶するフラグ
 let isDroppingAfterTarget = false;
-
 
 function handleDragStart(e) {
     draggedItem = this; // ドラッグされている要素を保持
@@ -272,8 +274,7 @@ function handleDragOver(e) {
 
     const targetItem = e.target.closest('.voice-button');
     if (targetItem && targetItem !== draggedItem) {
-        // ドロップターゲットがボタンの場合、カーソル位置による上下判定はここでは行わない
-        // ロジックはシンプルに、ターゲット全体にドロップとして扱う
+
     }
 }
 
@@ -340,7 +341,7 @@ function handleDragOver(e) {
     }
 
     // ------------------------------------------------------------------
-    // ★★★★ 【最終修正ロジック】: ターゲットの直後に挿入
+    // ターゲットの直後に挿入
     // ------------------------------------------------------------------
     
     // 1. 移動元要素を配列から取り出す（削除）
@@ -350,16 +351,8 @@ function handleDragOver(e) {
     let insertionIndex;
 
     if (oldIndex < newIndex) {
-        // 例: 1を3へ移動 (2314)。
-        // 1を削除すると3のインデックスは 2-1=1 となる。元の3の位置 (newIndex=2) に挿入すればOK。
         insertionIndex = newIndex; 
     } else {
-        // 例: 3を1へ移動 (3124)。
-        // 3を削除しても1のインデックスは 0 のまま。1の直後(インデックス1)に挿入したい。
-        // ★修正★: ターゲットのインデックス newIndex の位置に挿入する。
-        // splice(newIndex, 0, movedItem)とすると、movedItemはnewIndexの要素の前に挿入される。
-        // ターゲット(1)の前に挿入し、ターゲットを後ろにずらすことで、「ターゲットの直後」を実現する。
-        // favorites.splice(0, 0, 3) -> [3, 1, 2, 4] となる。
         insertionIndex = newIndex; 
     }
     
@@ -884,28 +877,61 @@ function handleVoiceButtonClick(soundPath) {
  * @param {string} url - 再生する音声ファイルのURL
  * @param {number} retries - 残りのリトライ回数
  */
-async function playAudioWithRetry(url, retries = 3) {
-    try {
-        const audio = new Audio(url);
-        await audio.load();
-        audio.currentTime = 0;
-        await audio.play();
-        console.log(`[Success] Audio requested: ${url}`);
-
-    } catch (error) {
-        if (error.name === "NotAllowedError" || error.name === "AbortError") {
-            console.warn(`[Warning] Audio play restricted. Path: ${url}. (User interaction required)`);
-        } else if (retries > 0) {
-            const delay = Math.pow(2, 3 - retries) * 500;
-            console.warn(`[Retry] Failed to load audio ${url}. Retrying in ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            playAudioWithRetry(url, retries - 1);
-        } else {
-            console.error(`[Error] Failed to load audio after all retries: ${url}`, error);
+async function playAudioWithRetry(url, retries = 3)
+{
+    const audio = preloadedAudioMap.get(url);
+    if (audio)
+    {
+        try
+        {
+            // 再生位置をリセット (頭切れ防止に必須)
+            audio.currentTime = 0;
+            
+            // 再生を実行
+            await audio.play();
+            console.log(`[Success] Preloaded audio played: ${url}`);
         }
+        catch (error)
+        {
+            // エラーハンドリング (ユーザー操作制限など)
+            if (error.name === "NotAllowedError" || error.name === "AbortError") {
+                 console.warn(`[Warning] Audio play restricted. Path: ${url}. (User interaction required)`);
+            } else {
+                 console.error(`[Error] Failed to play preloaded audio: ${url}`, error);
+            }
+        }
+    }
+    else
+    {
+        console.error(`[Error] Audio not preloaded: ${url}. Cannot play without delay.`);
     }
 }
 
+// -----------------------------------------------------------------
+// ★ 追加: 全ての音声ファイルを事前ロードする処理
+// -----------------------------------------------------------------
+function preloadAllAudio() {
+    VOICE_DATA.forEach(category => {
+        category.voices.forEach(voice => {
+            const soundPath = `${category.folder}/${voice.file}`;
+            const fullPath = 'sounds/' + soundPath;
+            
+            // 1. Audioオブジェクトを生成
+            const audio = new Audio(fullPath);
+            
+            // 2. load() を呼び出し、ファイルの読み込み/デコードを開始
+            // await を付けないことで、ロード完了を待たずに即座に初期化を完了させます。
+            audio.load().catch(e => {
+                // ロード失敗時のエラーハンドリング
+                console.warn(`[Preload Warning] Failed to load audio (non-blocking): ${fullPath}`, e);
+            });
+            
+            // 3. Audioオブジェクトをマップに保存
+            preloadedAudioMap.set(fullPath, audio);
+        });
+    });
+    console.log(`[Init] ${preloadedAudioMap.size} audio files are queued for preloading.`);
+}
 
 // =================================================================
 // 7. 初期化 (DOMContentLoadedイベントハンドラ)
@@ -916,10 +942,14 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFavoritesFromLocalStorage(); // 最初にローカルストレージからメモを読み込む
     generateAppStructure(VOICE_DATA);
 
+    //音声ファイルの事前ロードを開始
+    preloadAllAudio();
+    
     // 初期化時に全てのボタンの星の状態を同期
     updateAllVoiceButtonStates();
 
 });
+
 
 
 
