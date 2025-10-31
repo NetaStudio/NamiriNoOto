@@ -5,16 +5,17 @@
 /* GIF画像 */
 .logo-gif
 {
-    width: auto; /* モバイルでのデフォルトサイズ */
+    width: 300px; /* モバイルでのデフォルトサイズ */
     height: auto;
     object-fit: contain;
     vertical-align: middle;
     margin-top: 0px;
     margin-left: 0px;
+    margin-right: auto;
 }
 
-/* 768px (mdブレークポイント) 以上の画面サイズでの調整 */
-@media (min-width: 768px)
+/* 900px (mdブレークポイント) 以上の画面サイズでの調整 */
+@media (min-width: 900px)
 {
     /* GIF画像 */
     .logo-gif
@@ -200,4 +201,5 @@
         background-color: #e2ecf5; 
         color: #394363;
     }
+
 }
