@@ -970,33 +970,40 @@ function handleVoiceButtonClick(soundPath) {
     const masterAudio = AUDIO_POOL.get(soundPath);
     const fullPath = 'sounds/' + soundPath;
 
-    if (!masterAudio) {
-        // プールにない場合は、その場で Audio インスタンスを作成して再生を試みる（フォールバック）
-        console.warn(`[Warning] Audio not in pool, playing new Audio for: ${soundPath}`);
+    // HTMLMediaElement.readyState が 4 (HAVE_ENOUGH_DATA) ではない場合、
+    // まだデータが十分に揃っておらず、頭切れの原因となる。
+    // そのため、新規インスタンス作成 (playAudioDirectly) にフォールバックする。
+    if (!masterAudio || masterAudio.readyState < 4) {
+        // プールにない場合、またはプールにあるがデータが不完全な場合
+        // -> ユーザー操作内で新規インスタンスを作成し、即座にplay()
+        console.log(`[Play] Fallback: Playing new Audio instance for: ${soundPath}. ReadyState: ${masterAudio ? masterAudio.readyState : 'N/A'}`);
         playAudioDirectly(fullPath);
+
+        // ★重要: 不完全だったマスターインスタンスのロードを強制的に開始し直す
+        if (masterAudio) {
+            masterAudio.load();
+        }
         return;
     }
 
-    // 1. プールからクローンして再生を試みる (同時再生可能)
+    // データが完全に揃っている場合 (readyState === 4) のみクローンして再生
+    console.log(`[Play] Success: Playing cloned instance for: ${soundPath}. ReadyState: ${masterAudio.readyState}`);
     const audioToPlay = masterAudio.cloneNode(true);
 
     // 現在の再生位置をリセット
     audioToPlay.currentTime = 0;
 
     audioToPlay.play().catch(error => {
-        // 2. ★モバイル対応の核心★: play()が拒否された場合
+        // モバイルポリシー違反の場合のフォールバック
         if (error.name === "NotAllowedError" || error.name === "AbortError") {
              console.warn(`[Warning] Auto-play blocked. Retrying with a new Audio instance in the same click event.`);
-
-             // ユーザー操作のコンテキスト内で、新しいAudioインスタンスを生成し直して再生を試みる
              playAudioDirectly(fullPath);
-
         } else {
              console.error(`[Error] Failed to play audio: ${soundPath}`, error);
         }
     });
 
-    // 3. クリーンアップ
+    // クリーンアップ
     audioToPlay.addEventListener('ended', () => {
         audioToPlay.remove();
     });
@@ -1004,6 +1011,7 @@ function handleVoiceButtonClick(soundPath) {
 
 /**
  * 新しい Audio インスタンスを作成して再生する (フォールバック & ブロック解除用)
+ * (変更なし)
  * @param {string} fullPath - 音声ファイルのフルパス
  */
 function playAudioDirectly(fullPath) {
