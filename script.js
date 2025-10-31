@@ -237,6 +237,45 @@ const VOICE_DATA =
     }
 ];
 
+
+
+/**
+ * 事前ロードされた Audio インスタンスを保持するマップ
+ * キー: ボイスID (folder/file.mp3), 値: HTMLAudioElement
+ */
+const AUDIO_POOL = new Map();
+
+/**
+ * 全ての音声ファイルを事前にロードする
+ */
+function preloadAllVoices() {
+    console.log("[INIT] Starting audio preloading...");
+    let loadedCount = 0;
+    let totalVoices = 0;
+
+    VOICE_DATA.forEach(category => {
+        category.voices.forEach(voice => {
+            totalVoices++;
+            const voiceId = `${category.folder}/${voice.file}`;
+            const fullPath = 'sounds/' + voiceId;
+            const audio = new Audio(fullPath);
+
+            // Audioインスタンスをロード
+            // play()を速くするためにロードを試みる
+            audio.load();
+
+            // プールに保存
+            AUDIO_POOL.set(voiceId, audio);
+
+            // 読み込み完了を待たずに次の処理へ
+            loadedCount++;
+        });
+    });
+
+    console.log(`[INIT] Preloading finished for ${loadedCount}/${totalVoices} voices. Ready to play.`);
+}
+
+
 // =================================================================
 // 2. メモ機能の管理 (Arrayに変更し、順序を保持)
 // =================================================================
@@ -868,42 +907,58 @@ function showCategory(categoryId) {
 // =================================================================
 // 6. 音声再生ロジック
 // =================================================================
-
 /**
  * ボイスボタンがクリックされた時の処理
+ * (再生遅延と音の途切れを解決するため、プールからクローンして再生)
  * @param {string} soundPath - ボイスのユニークID (folder/file.wav)
  */
 function handleVoiceButtonClick(soundPath) {
-    const fullPath = 'sounds/' + soundPath;
+    // 1. プールからマスターのAudioインスタンスを取得
+    const masterAudio = AUDIO_POOL.get(soundPath);
 
-    playAudioWithRetry(fullPath);
+    if (!masterAudio) {
+        console.error(`[Error] Audio not preloaded for: ${soundPath}`);
+        // フォールバック: その場で Audio インスタンスを作成（遅延が発生する可能性あり）
+        const fullPath = 'sounds/' + soundPath;
+        playNewAudio(fullPath);
+        return;
+    }
+
+    // 2. マスターインスタンスをクローンして新しいインスタンスを作成
+    //    -> これにより、同時再生が可能になり、既存の再生が中断されなくなります。
+    const audioToPlay = masterAudio.cloneNode(true);
+
+    // 3. 再生
+    //    -> 事前ロード済みのため、遅延が最小限になります。
+    audioToPlay.play().catch(error => {
+        // Autoplay policy に引っかかった場合の警告
+        if (error.name === "NotAllowedError" || error.name === "AbortError") {
+             console.warn(`[Warning] Audio play restricted. Path: ${soundPath}. (User interaction required)`);
+        } else {
+             console.error(`[Error] Failed to play audio: ${soundPath}`, error);
+        }
+    });
+
+    // 4. クリーンアップ
+    // 音声再生完了後にDOMから自動で削除されるようにイベントリスナーを設定
+    audioToPlay.addEventListener('ended', () => {
+        // メモリリークを防ぐため、再生終了後に参照を解放する（完全に解放されるかはブラウザ依存）
+        audioToPlay.remove();
+    });
 }
 
 /**
- * 指数バックオフ付きのFetch関数 (音声再生)
- * @param {string} url - 再生する音声ファイルのURL
- * @param {number} retries - 残りのリトライ回数
+ * (フォールバック用) 新しい Audio インスタンスを作成して再生
+ * @param {string} fullPath - 音声ファイルのフルパス
  */
-async function playAudioWithRetry(url, retries = 3) {
-    try {
-        const audio = new Audio(url);
-        await audio.load();
-        audio.currentTime = 0;
-        await audio.play();
-        console.log(`[Success] Audio requested: ${url}`);
-
-    } catch (error) {
-        if (error.name === "NotAllowedError" || error.name === "AbortError") {
-            console.warn(`[Warning] Audio play restricted. Path: ${url}. (User interaction required)`);
-        } else if (retries > 0) {
-            const delay = Math.pow(2, 3 - retries) * 500;
-            console.warn(`[Retry] Failed to load audio ${url}. Retrying in ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            playAudioWithRetry(url, retries - 1);
-        } else {
-            console.error(`[Error] Failed to load audio after all retries: ${url}`, error);
-        }
-    }
+function playNewAudio(fullPath) {
+    const audio = new Audio(fullPath);
+    audio.play().catch(error => {
+        console.error(`[Error] Fallback play failed for: ${fullPath}`, error);
+    });
+    audio.addEventListener('ended', () => {
+        audio.remove();
+    });
 }
 
 
@@ -916,7 +971,9 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFavoritesFromLocalStorage(); // 最初にローカルストレージからメモを読み込む
     generateAppStructure(VOICE_DATA);
 
+    // ★追加: 全ての音声ファイルを事前に読み込み、プールを作成
+    preloadAllVoices();
+
     // 初期化時に全てのボタンの星の状態を同期
     updateAllVoiceButtonStates();
-
 });
