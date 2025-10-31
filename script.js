@@ -275,7 +275,6 @@ function preloadCategoryVoices(categoryId) {
         if (!AUDIO_POOL.has(voiceId)) {
             const fullPath = 'sounds/' + voiceId;
             const audio = new Audio(fullPath);
-            audio.load(); // ロードを試みる
             AUDIO_POOL.set(voiceId, audio);
         }
     });
@@ -946,36 +945,38 @@ function showCategory(categoryId) {
  * @param {string} soundPath - ボイスのユニークID (folder/file.wav)
  */
 function handleVoiceButtonClick(soundPath) {
-    // 1. プールからマスターのAudioインスタンスを取得
     const masterAudio = AUDIO_POOL.get(soundPath);
+    const fullPath = 'sounds/' + soundPath;
 
     if (!masterAudio) {
-        console.error(`[Error] Audio not preloaded for: ${soundPath}`);
-        // フォールバック: その場で Audio インスタンスを作成（遅延が発生する可能性あり）
-        const fullPath = 'sounds/' + soundPath;
-        playNewAudio(fullPath);
+        // プールにない場合は、その場で Audio インスタンスを作成して再生を試みる
+        console.warn(`[Warning] Audio not in pool, playing new Audio for: ${soundPath}`);
+        playAudioDirectly(fullPath);
         return;
     }
 
-    // 2. マスターインスタンスをクローンして新しいインスタンスを作成
-    //    -> これにより、同時再生が可能になり、既存の再生が中断されなくなります。
+    // 1. プールからクローンして再生を試みる
     const audioToPlay = masterAudio.cloneNode(true);
 
-    // 3. 再生
-    //    -> 事前ロード済みのため、遅延が最小限になります。
+    // 現在の再生位置をリセット（重要：最初から鳴らすため）
+    audioToPlay.currentTime = 0;
+
     audioToPlay.play().catch(error => {
-        // Autoplay policy に引っかかった場合の警告
+        // 2. ★モバイル対応の核心★: play()が拒否された場合
         if (error.name === "NotAllowedError" || error.name === "AbortError") {
-             console.warn(`[Warning] Audio play restricted. Path: ${soundPath}. (User interaction required)`);
+             console.warn(`[Warning] Auto-play blocked. Retrying with a new Audio instance in the same click event.`);
+
+             // ユーザー操作のコンテキスト内で、新しいAudioインスタンスを生成し直して再生を試みる
+             // これで多くのモバイルブラウザでブロックが解除されます。
+             playAudioDirectly(fullPath);
+
         } else {
              console.error(`[Error] Failed to play audio: ${soundPath}`, error);
         }
     });
 
-    // 4. クリーンアップ
-    // 音声再生完了後にDOMから自動で削除されるようにイベントリスナーを設定
+    // 3. クリーンアップ
     audioToPlay.addEventListener('ended', () => {
-        // メモリリークを防ぐため、再生終了後に参照を解放する（完全に解放されるかはブラウザ依存）
         audioToPlay.remove();
     });
 }
@@ -984,11 +985,15 @@ function handleVoiceButtonClick(soundPath) {
  * (フォールバック用) 新しい Audio インスタンスを作成して再生
  * @param {string} fullPath - 音声ファイルのフルパス
  */
-function playNewAudio(fullPath) {
+function playAudioDirectly(fullPath) {
+    // ユーザー操作 (クリック) のコンテキスト内でインスタンスを生成
     const audio = new Audio(fullPath);
+
     audio.play().catch(error => {
-        console.error(`[Error] Fallback play failed for: ${fullPath}`, error);
+        // ログに残す
+        console.error(`[Error] Direct play failed for: ${fullPath}`, error);
     });
+
     audio.addEventListener('ended', () => {
         audio.remove();
     });
