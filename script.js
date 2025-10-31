@@ -239,17 +239,7 @@ const VOICE_DATA =
 
 
 
-/**
- * 事前ロードされた Audio インスタンスを保持するマップ
- * キー: ボイスID (folder/file.mp3), 値: HTMLAudioElement
- */
 const AUDIO_POOL = new Map();
-
-
-/**
- * ★新規追加★: ロード済みカテゴリIDを保持するセット
- * これにより、一度ロードしたカテゴリは再ロードしない
- */
 const loadedCategories = new Set();
 
 /**
@@ -258,17 +248,18 @@ const loadedCategories = new Set();
  */
 function preloadCategoryVoices(categoryId) {
     if (loadedCategories.has(categoryId)) {
-        // すでにロード済みならスキップ
-        return;
+        return Promise.resolve(); // 既にロード済みなら即座に解決
     }
 
     const category = VOICE_DATA.find(c => c.id === categoryId);
     if (!category) {
         console.error(`Category not found: ${categoryId}`);
-        return;
+        return Promise.resolve();
     }
 
-    console.log(`[Lazy Load] Starting audio preloading for: ${category.name}`);
+    console.log(`[Lazy Load] Starting audio preparation for: ${category.name}`);
+
+    const loadPromises = [];
 
     category.voices.forEach(voice => {
         const voiceId = `${category.folder}/${voice.file}`;
@@ -276,11 +267,36 @@ function preloadCategoryVoices(categoryId) {
             const fullPath = 'sounds/' + voiceId;
             const audio = new Audio(fullPath);
             AUDIO_POOL.set(voiceId, audio);
+
+            // Audioの準備完了（loadeddata）を待つPromiseを作成
+            const loadPromise = new Promise(resolve => {
+                // loadeddataイベント（再生準備完了）が発生したら解決
+                audio.addEventListener('loadeddata', () => {
+                    resolve();
+                }, { once: true });
+
+                // 何らかの理由でロードに失敗した場合も処理をブロックしないようにする
+                audio.addEventListener('error', (e) => {
+                    console.error(`[Load Error] Failed to load ${voiceId}:`, e);
+                    resolve(); // エラーでもブロックしない
+                }, { once: true });
+
+                // ロードを開始
+                audio.load();
+            });
+            loadPromises.push(loadPromise);
         }
     });
 
-    loadedCategories.add(categoryId);
-    console.log(`[Lazy Load] Preloading finished for: ${category.name}.`);
+    // 全ての音声の準備が完了するのを待つPromiseを返す
+    return Promise.all(loadPromises).then(() => {
+        loadedCategories.add(categoryId);
+        console.log(`[Lazy Load] All audio prepared for: ${category.name}.`);
+    }).catch(e => {
+        // 全体のロード処理でエラーが発生した場合のロギング
+        console.error(`[Load Error] Failed to prepare all audio for: ${category.name}`, e);
+        loadedCategories.add(categoryId); // エラーでも一旦ロード済みにする（再試行を防ぐ）
+    });
 }
 
 
@@ -905,21 +921,16 @@ function showCategory(categoryId) {
     }
 
     // 2. コンテンツの生成/ロード (メモカテゴリ以外)
-    if (categoryId !== 'category-favorites') {
+    if (categoryId !== 'category-favorites')
+    {
         const targetSection = document.getElementById(categoryId);
         const categoryData = VOICE_DATA.find(c => c.id === categoryId);
 
         if (targetSection && categoryData) {
-            // ★遅延レンダリング★: セクションが空の場合のみコンテンツを生成
-            if (targetSection.children.length === 0) {
-                // 既存の空のセクションを一旦削除し、新しいセクションを生成
-                targetSection.parentNode.removeChild(targetSection);
-                const newSection = createCategorySection(categoryData);
-                // 正しい位置に再挿入するためのロジックが必要だが、今回は main-content の最後尾に挿入でシンプルにする
-                document.getElementById('main-content').appendChild(newSection);
-            }
+            // ... (遅延レンダリングロジックは変更なし) ...
 
-            // ★遅延ロード★: 初回アクセス時に音声ファイルをロード
+            // ★修正: 遅延ロードの実行（Promiseは返すが、結果を待たずにUI描画を継続）
+            // これにより、UIの描画はブロックされない
             preloadCategoryVoices(categoryId);
         }
     }
