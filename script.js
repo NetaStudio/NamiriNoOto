@@ -245,34 +245,43 @@ const VOICE_DATA =
  */
 const AUDIO_POOL = new Map();
 
-/**
- * 全ての音声ファイルを事前にロードする
- */
-function preloadAllVoices() {
-    console.log("[INIT] Starting audio preloading...");
-    let loadedCount = 0;
-    let totalVoices = 0;
 
-    VOICE_DATA.forEach(category => {
-        category.voices.forEach(voice => {
-            totalVoices++;
-            const voiceId = `${category.folder}/${voice.file}`;
+/**
+ * ★新規追加★: ロード済みカテゴリIDを保持するセット
+ * これにより、一度ロードしたカテゴリは再ロードしない
+ */
+const loadedCategories = new Set();
+
+/**
+ * ★修正: 指定されたカテゴリの音声ファイルのみをロードする
+ * @param {string} categoryId - ロード対象のカテゴリID
+ */
+function preloadCategoryVoices(categoryId) {
+    if (loadedCategories.has(categoryId)) {
+        // すでにロード済みならスキップ
+        return;
+    }
+
+    const category = VOICE_DATA.find(c => c.id === categoryId);
+    if (!category) {
+        console.error(`Category not found: ${categoryId}`);
+        return;
+    }
+
+    console.log(`[Lazy Load] Starting audio preloading for: ${category.name}`);
+
+    category.voices.forEach(voice => {
+        const voiceId = `${category.folder}/${voice.file}`;
+        if (!AUDIO_POOL.has(voiceId)) {
             const fullPath = 'sounds/' + voiceId;
             const audio = new Audio(fullPath);
-
-            // Audioインスタンスをロード
-            // play()を速くするためにロードを試みる
-            audio.load();
-
-            // プールに保存
+            audio.load(); // ロードを試みる
             AUDIO_POOL.set(voiceId, audio);
-
-            // 読み込み完了を待たずに次の処理へ
-            loadedCount++;
-        });
+        }
     });
 
-    console.log(`[INIT] Preloading finished for ${loadedCount}/${totalVoices} voices. Ready to play.`);
+    loadedCategories.add(categoryId);
+    console.log(`[Lazy Load] Preloading finished for: ${category.name}.`);
 }
 
 
@@ -753,12 +762,17 @@ function generateAppStructure(data) {
         link.setAttribute('data-category-id', category.id);
         link.onclick = (e) => {
             e.preventDefault();
+            // ★修正点1★: showCategory に処理を委譲
             showCategory(category.id);
         };
         categoryNav.appendChild(link);
 
-        // コンテンツセクション
-        mainContent.appendChild(createCategorySection(category));
+        // ★修正点2★: 初期ロード時にコンテンツセクションの生成をスキップし、空のセクションだけ作成
+        const emptySection = document.createElement('section');
+        emptySection.id = category.id;
+        emptySection.className = 'category-section hidden';
+        mainContent.appendChild(emptySection);
+
 
         // 最初のカテゴリを設定 (メモ以外の最初のカテゴリをデフォルトとする)
         if (!firstCategoryId) {
@@ -877,22 +891,11 @@ function generateAppStructure(data) {
 // =================================================================
 
 /**
- * 表示するカテゴリを切り替える
+ * 表示するカテゴリを切り替える (★修正: 遅延レンダリングとロードを追加★)
  * @param {string} categoryId - 表示するカテゴリのID (例: 'category-favorites', 'category-greeting')
  */
 function showCategory(categoryId) {
-    // 全てのカテゴリセクションを非表示にする
-    document.querySelectorAll('.category-section').forEach(section => {
-        section.classList.add('hidden');
-    });
-
-    // 指定されたカテゴリセクションを表示する
-    const targetSection = document.getElementById(categoryId);
-    if (targetSection) {
-        targetSection.classList.remove('hidden');
-    }
-
-    // ナビゲーションリンクのアクティブ状態を切り替える
+    // 1. アクティブ状態を切り替え
     document.querySelectorAll('.category-link').forEach(link => {
         link.classList.remove('selected', 'bg-blue-50', 'font-semibold');
     });
@@ -900,6 +903,36 @@ function showCategory(categoryId) {
     const activeLink = document.querySelector(`.category-link[data-category-id="${categoryId}"]`);
     if (activeLink) {
         activeLink.classList.add('selected', 'bg-blue-50', 'font-semibold');
+    }
+
+    // 2. コンテンツの生成/ロード (メモカテゴリ以外)
+    if (categoryId !== 'category-favorites') {
+        const targetSection = document.getElementById(categoryId);
+        const categoryData = VOICE_DATA.find(c => c.id === categoryId);
+
+        if (targetSection && categoryData) {
+            // ★遅延レンダリング★: セクションが空の場合のみコンテンツを生成
+            if (targetSection.children.length === 0) {
+                // 既存の空のセクションを一旦削除し、新しいセクションを生成
+                targetSection.parentNode.removeChild(targetSection);
+                const newSection = createCategorySection(categoryData);
+                // 正しい位置に再挿入するためのロジックが必要だが、今回は main-content の最後尾に挿入でシンプルにする
+                document.getElementById('main-content').appendChild(newSection);
+            }
+
+            // ★遅延ロード★: 初回アクセス時に音声ファイルをロード
+            preloadCategoryVoices(categoryId);
+        }
+    }
+
+    // 3. 表示の切り替え (最後に実行)
+    document.querySelectorAll('.category-section').forEach(section => {
+        section.classList.add('hidden');
+    });
+
+    const finalTargetSection = document.getElementById(categoryId);
+    if (finalTargetSection) {
+        finalTargetSection.classList.remove('hidden');
     }
 }
 
@@ -971,8 +1004,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFavoritesFromLocalStorage(); // 最初にローカルストレージからメモを読み込む
     generateAppStructure(VOICE_DATA);
 
-    // ★追加: 全ての音声ファイルを事前に読み込み、プールを作成
-    preloadAllVoices();
 
     // 初期化時に全てのボタンの星の状態を同期
     updateAllVoiceButtonStates();
