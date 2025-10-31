@@ -328,6 +328,9 @@ function preloadCategoryVoices(categoryId) {
  * Web Audio APIを完全に起動させるための無音バッファ再生
  */
 function playSilentBuffer() {
+    if (audioContext.state !== 'running') {
+        return; // 実行状態でなければ再生しない
+    }
     // 1サンプル長 (極めて短い) の無音バッファを作成
     const buffer = audioContext.createBuffer(1, 1, audioContext.sampleRate);
     const source = audioContext.createBufferSource();
@@ -337,6 +340,8 @@ function playSilentBuffer() {
     source.onended = () => {
         source.disconnect();
     };
+    isContextActivated = true;
+    console.log("[INIT] Web Audio output activated with silent buffer.");
 }
 
 /**
@@ -1053,12 +1058,11 @@ function showCategory(categoryId) {
  * @param {AudioBuffer} buffer - デコード済みの音声データ
  */
 function playAudioBuffer(buffer) {
-    if (!buffer) {
+if (!buffer) {
         console.error("[Play Error] AudioBuffer is not available.");
         return;
     }
 
-    // 毎回新しいノードを作成するため同時再生可能
     const source = audioContext.createBufferSource();
     source.buffer = buffer;
     source.connect(audioContext.destination);
@@ -1068,22 +1072,33 @@ function playAudioBuffer(buffer) {
         source.disconnect();
     };
 }
-
 /**
  * ボイスボタンがクリックされた時の処理 (async関数)
- * ★デコード完了まで完全に待機し、音が途切れないことを保証します。
+ * ★最初のクリックでのみ、AudioContextの起動と出力バッファの準備を保証します。
  * @param {string} soundPath - ボイスのユニークID (folder/file.wav)
  */
 async function handleVoiceButtonClick(soundPath) {
-    // 1. AudioContextの起動を試みる (初回クリック時に自動で実行)
-    // PC/モバイル問わず、ユーザー操作内で起動処理を完了させます。
-    if (audioContext.state === 'suspended') {
-        try {
-            // AudioContextの起動を試行し、完了を待つ
-            await audioContext.resume();
-        } catch (e) {
-            console.error("[AudioContext] Failed to resume:", e);
+    // 1. ★初回クリック時の起動と出力バッファの強制初期化 (PC対策)★
+    if (!isContextActivated) {
+        // a. AudioContextの起動を試みる (ユーザー操作のコンテキスト内)
+        if (audioContext.state === 'suspended') {
+            try {
+                // resume()の完了を待機
+                await audioContext.resume();
+            } catch (e) {
+                console.error("[AudioContext] Resume failed:", e);
+                // 失敗しても先に進む
+            }
         }
+
+        // b. AudioContextがrunning状態であれば、無音再生を実行し出力バッファを準備
+        if (audioContext.state === 'running') {
+            playSilentBuffer();
+            // フラグはplaySilentBuffer内でセットされる
+        }
+
+        // 最初のクリック時には、この処理に時間がかかるため、後続の処理に進む前に
+        // ブラウザに任せます。
     }
 
     // 2. AudioBufferの状態を確認
@@ -1094,11 +1109,9 @@ async function handleVoiceButtonClick(soundPath) {
     if (!audioBuffer) {
         console.warn(`[Play] Delaying: AudioBuffer not ready for: ${soundPath}. Fetching and decoding now.`);
 
-        // ★最重要修正★: AudioBufferのデコード完了を完全に待機する (遅延を許容して途切れを防ぐ)
+        // 遅延を許容し、デコード完了を完全に待機
         try {
-            // loadAndDecodeAudioは非同期でデコードを行うため、完了まで待機
             audioBuffer = await loadAndDecodeAudio(fullPath);
-            // 完了したAudioBufferをプールに保存 (次回以降は高速再生)
             AUDIO_POOL.set(soundPath, audioBuffer);
             console.log(`[Play] Ready after delay: ${soundPath}`);
         } catch (error) {
@@ -1107,8 +1120,7 @@ async function handleVoiceButtonClick(soundPath) {
         }
     }
 
-    // 4. AudioBufferが完全に揃っている場合
-    // デコード完了を待った後のため、ここでの再生は頭切れしないことが保証されます。
+    // 4. AudioBufferが完全に揃っている場合、再生を開始
     console.log(`[Play] Success: Playing AudioBuffer for: ${soundPath}`);
     playAudioBuffer(audioBuffer);
 }
