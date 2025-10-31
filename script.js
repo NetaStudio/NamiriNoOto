@@ -326,12 +326,15 @@ let draggedItem = null;
     // ローカルストレージに保存
     saveFavoritesToLocalStorage();
 
-    // UIを再レンダリング (メモカテゴリの再描画)
+    // 1. メモカテゴリを更新・再描画する (DOM要素を置き換える)
     updateFavoriteCategory(); 
-    // 全てのボタンの星アイコンの状態を更新 (メモカテゴリの再描画後に実行することが重要)
-    updateAllVoiceButtonStates(); 
-    // 現在の表示をメモカテゴリに切り替える
+    
+    // 2. メモカテゴリに切り替える（置き換えたDOM要素を可視化する）
     showCategory('category-favorites'); 
+
+    // 3. 全てのボタンの星アイコンの状態を更新 (再描画されたDOM要素に対して行う)
+    // これにより、メモカテゴリの新しいボタンにも星が正しく表示されます。
+    updateAllVoiceButtonStates(); 
     
     // 状態をリセット
     resetDragState();
@@ -382,8 +385,9 @@ function toggleFavorite(voiceId, event) {
     }
 
     const index = favorites.indexOf(voiceId);
+    let wasFavorite = index > -1;
 
-    if (index > -1) {
+    if (wasFavorite) {
         // 登録済みなら削除
         favorites.splice(index, 1);
     } else {
@@ -393,18 +397,22 @@ function toggleFavorite(voiceId, event) {
 
     saveFavoritesToLocalStorage();
 
+    // 現在アクティブなカテゴリIDを取得
+    const activeLink = document.querySelector('.category-link.selected');
+    const activeCategoryId = activeLink ? activeLink.getAttribute('data-category-id') : null;
+
     // 1. メモカテゴリを更新・再描画する
     updateFavoriteCategory();
 
-    // 2. 全てのカテゴリボタンの状態を更新 (再描画されたDOM要素に対して行う)
-    updateAllVoiceButtonStates();
-
-    // 3. もしメモカテゴリが表示中なら、表示中のセクションを強制的に更新する
-    const activeLink = document.querySelector('.category-link.selected');
-    if (activeLink && activeLink.getAttribute('data-category-id') === 'category-favorites') {
+    // 2. もしメモカテゴリがアクティブだった場合、表示を更新する
+    if (activeCategoryId === 'category-favorites') {
         // メモカテゴリが再描画されたので、アクティブ表示を維持するために再実行する
         showCategory('category-favorites'); 
     }
+
+    // 3. 全てのカテゴリボタンの状態を更新 (再描画されたDOM要素に対して行う)
+    // これにより、メモカテゴリの新しいボタンと通常カテゴリのボタン全てが同期されます。
+    updateAllVoiceButtonStates();
 }
 
 /**
@@ -413,6 +421,7 @@ function toggleFavorite(voiceId, event) {
  */
 function updateAllVoiceButtonStates() {
     // 現在DOMに存在する全ての.voice-button要素を取得
+    // querySelectorAllはライブノードリストではないため、この時点で存在する要素を正確に取得します。
     const allVoiceButtons = document.querySelectorAll('.voice-button');
 
     allVoiceButtons.forEach(button => {
@@ -471,8 +480,6 @@ function getFavoriteVoices() {
  * メモリストをクリアする
  */
 function clearFavorites() {
-    // ユーザーに確認を求める (alert/confirmは使用不可のため、ここでは直接実行)
-    // 実際のアプリではモーダルで確認が必要です
     const confirmed = window.confirm("本当にメモリストを全て削除しますか？");
     if (!confirmed) {
         return;
@@ -527,10 +534,6 @@ function createVoiceButton(categoryFolder, voice, isDraggable = false) {
 
     button.appendChild(iconSpan);
     
-    // ⚠️ 初期作成時にはアイコンの状態を設定しない。
-    // 全てのボタンがDOMに追加された後、updateAllVoiceButtonStatesでまとめて設定する。
-    // これにより、初回読み込み時も状態が統一されます。
-
     return button;
 }
 
@@ -584,8 +587,8 @@ function createFavoriteCategorySection(favoriteVoices) {
     jpTitle.className = 'mr-2';
     titleContainer.appendChild(jpTitle);
     
-    const enTitle = document.createElement('span');
-    enTitle.textContent = `(Bookmark)`;
+    const enName = document.createElement('span');
+    enName.textContent = `(Bookmark)`;
     enName.className = 'text-lg font-normal text-gray-400'; 
     titleContainer.appendChild(enName);
     
