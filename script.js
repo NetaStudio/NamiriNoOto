@@ -886,35 +886,44 @@ function handleVoiceButtonClick(soundPath) {
 
 /**
  * 指数バックオフ付きのFetch関数 (音声再生)
- * ★ 修正: 事前ロードされたAudioオブジェクトを使用して即時再生を行うように変更。
- * 遅延の原因であった new Audio() と await audio.load() を削除しました。
+ * ★★★ 修正: 単一オブジェクトの再利用をやめ、マスターオブジェクトをクローンして同時再生に対応 ★★★
  * @param {string} url - 再生する音声ファイルのURL
- * @param {number} retries - 残りのリトライ回数 (この実装では無視されます)
  */
-async function playAudioWithRetry(url, retries = 3) {
-    const audio = preloadedAudioMap.get(url);
+async function playAudioWithRetry(url) {
+    const masterAudio = preloadedAudioMap.get(url);
 
-    if (audio) {
+    if (masterAudio) {
+        // 1. マスターAudioオブジェクトをクローン (新しい再生インスタンスを作成)
+        const audioInstance = masterAudio.cloneNode(true); 
+
         try {
-            // 再生位置をリセット (頭切れ防止に必須)
-            audio.currentTime = 0;
+            // 2. 再生位置をリセット
+            audioInstance.currentTime = 0;
             
-            // 再生を実行
-            // play() は Promise を返すので await を使用しますが、ボタンクリックイベント内なので遅延はほとんどありません。
-            await audio.play();
-            console.log(`[Success] Preloaded audio played: ${url}`);
+            // 3. 再生を実行 (他のインスタンスの再生を邪魔しない)
+            // play() は Promise を返しますが、クリックイベント内のため遅延は発生しません。
+            await audioInstance.play();
+            console.log(`[Success] Cloned audio played: ${url}`);
+            
+            // 4. (推奨) 再生終了後にクローンしたAudioオブジェクトをクリーンアップ
+            audioInstance.onended = () => {
+                // Audio要素はDOM外に存在するため、メモリ解放のヒントを与える
+                audioInstance.src = ''; // ソースをクリア
+                // Audioオブジェクト自体を明示的に解放する標準的な方法はないが、
+                // srcをクリアし、参照を切ることでGCによる解放を促す
+            };
+            
         } catch (error) {
             // エラーハンドリング (ユーザー操作制限など)
             if (error.name === "NotAllowedError" || error.name === "AbortError") {
                  console.warn(`[Warning] Audio play restricted. Path: ${url}. (User interaction required)`);
             } else {
-                 console.error(`[Error] Failed to play preloaded audio: ${url}`, error);
+                 console.error(`[Error] Failed to play cloned audio: ${url}`, error);
             }
         }
     } else {
         // 事前ロードが失敗したか、まだ完了していない場合のエラーメッセージ
         console.error(`[Error] Audio not preloaded: ${url}. Cannot play without delay. (Preload failed or not yet completed)`);
-        // 応急処置として、遅延を許容して新しいAudioオブジェクトで再生を試みることもできますが、今回は低遅延を優先しエラーを出す
     }
 }
 
@@ -925,7 +934,6 @@ async function playAudioWithRetry(url, retries = 3) {
 
 /**
  * VOICE_DATAに基づき、全ての音声ファイルを事前にロードし、Audioオブジェクトを保持します。
- * load() が Promise を返さない環境に対応するため、.catch() を削除し、error イベントをリッスンするように変更しました。
  */
 function preloadAllAudio() {
     VOICE_DATA.forEach(category => {
@@ -933,7 +941,7 @@ function preloadAllAudio() {
             const soundPath = `${category.folder}/${voice.file}`;
             const fullPath = 'sounds/' + soundPath;
             
-            // 1. Audioオブジェクトを生成
+            // 1. Audioオブジェクトを生成 (これがクローン元となるマスター)
             const audio = new Audio(fullPath);
             
             // 2. load() の Promise チェーンエラーを防ぐため、error イベントをリッスンします。
