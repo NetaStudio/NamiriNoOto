@@ -302,23 +302,15 @@ let draggedItem = null;
     // 移動元要素を配列から一時的に取り除く
     const movedItem = favorites.splice(oldIndex, 1)[0];
     
-    // =================================================================
-    // ★★★★ 修正した挿入インデックス計算ロジック (上下判定なし) ★★★★
-    // ターゲットの場所に移動する要素を挿入する（ターゲットの直前に挿入される）
-    // splice(newIndex, 0, movedItem) とすると、
-    // movedItem は newIndex の要素の前に挿入されるため、純粋な「入れ替え」動作となる
-    // =================================================================
+    // ターゲットの場所に移動する要素を挿入する（ターゲットの直前に挿入される = 入れ替え動作）
     let insertionIndex = newIndex;
 
-    // 配列の境界チェックと調整
+    // 配列の境界チェックと調整 (念のため)
     if (insertionIndex > favorites.length) {
         insertionIndex = favorites.length;
     } else if (insertionIndex < 0) {
         insertionIndex = 0;
     }
-    // =================================================================
-    // ★★★★ 修正終わり ★★★★
-    // =================================================================
 
     // 新しい位置に要素を挿入
     favorites.splice(insertionIndex, 0, movedItem);
@@ -508,7 +500,7 @@ function createVoiceButton(categoryFolder, voice, isDraggable = false) {
     button.setAttribute('data-sound', voiceId);
     button.setAttribute('data-text', voice.text);
     // AudioContextが動作するように、クリック時にAudioContextの初期化を試みる
-    button.setAttribute('onclick', `handleVoiceButtonClick('${voiceId}')`);
+    button.setAttribute('onclick', `handleVoiceButtonClick('${voiceId}')`); // ★修正ポイント: この関数が定義されていなかった
 
     if (isDraggable) {
         button.setAttribute('draggable', 'true');
@@ -719,7 +711,6 @@ function generateAppStructure(data) {
         e.dataTransfer.dropEffect = 'move';
         
         // --- 視覚フィードバックの制御 ---
-        // ここで、上半分/下半分の判定を削除し、ターゲットボタン全体が対象であることを維持します。
         const targetItem = e.target.closest('.voice-button');
 
         // 全てのアイテムから強調表示を削除
@@ -871,6 +862,17 @@ function unlockAudioContext(voiceId) {
 // =================================================================
 
 /**
+ * ★★★ 修正ポイント ★★★
+ * HTMLのボタンから呼び出されるクリックハンドラ
+ * @param {string} voiceId - 再生するボイスのユニークID
+ */
+function handleVoiceButtonClick(voiceId) {
+    // ボタン全体がクリックされた場合、お気に入りアイコンのクリックではないことを確認
+    // お気に入りアイコンのクリックは、stopPropagationでボタンクリックイベントの発生を防ぐべき
+    playVoice(voiceId);
+}
+
+/**
  * 指定されたボイスIDの音声ファイルを再生する
  * @param {string} voiceId - 再生するボイスのユニークID (例: 01_greeting/file.mp3)
  */
@@ -898,7 +900,8 @@ async function playAudioWithRetry(url, retries = 3) {
         const existingAudio = document.getElementById('current-audio-player');
         if (existingAudio) {
             existingAudio.pause();
-            existingAudio.remove();
+            // 完全にDOMから削除
+            existingAudio.remove(); 
         }
 
         const audio = new Audio(url);
@@ -908,9 +911,18 @@ async function playAudioWithRetry(url, retries = 3) {
         // ロード完了を待つ（ネットワークエラーをここで捕捉できる）
         await new Promise((resolve, reject) => {
             audio.addEventListener('canplaythrough', resolve, { once: true });
-            audio.addEventListener('error', reject, { once: true });
+            audio.addEventListener('error', (e) => {
+                // エラーイベントから詳細情報を抽出
+                reject(new Error(`Audio load error: ${e.target.error.code || 'Unknown error'}`));
+            }, { once: true });
             // タイムアウトも設定
-            setTimeout(() => reject(new Error('Audio load timed out')), 5000); 
+            const timeoutId = setTimeout(() => reject(new Error('Audio load timed out (5s)')), 5000); 
+            
+            // ロードが成功または失敗した場合、タイムアウトをクリア
+            const cleanUp = () => clearTimeout(timeoutId);
+            audio.addEventListener('canplaythrough', cleanUp, { once: true });
+            audio.addEventListener('error', cleanUp, { once: true });
+
             audio.load();
         });
 
@@ -924,8 +936,9 @@ async function playAudioWithRetry(url, retries = 3) {
         }, { once: true });
 
     } catch (error) {
+        // エラー名またはメッセージに基づいて処理
         if (error.name === "NotAllowedError" || error.name === "AbortError" || error.message.includes("timed out")) {
-            console.warn(`[Warning] Audio play restricted or Load timeout. Path: ${url}. (User interaction required or bad network)`);
+            console.warn(`[Warning] Audio play restricted or Load timeout. Path: ${url}. (Error: ${error.message})`);
         } else if (retries > 0) {
             const delay = Math.pow(2, 3 - retries) * 500;
             console.warn(`[Retry] Failed to load audio ${url}. Retrying in ${delay}ms... (Error: ${error.message})`);
