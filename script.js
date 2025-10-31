@@ -882,7 +882,7 @@ function playVoice(voiceId) {
         return; // 初回はアンロック処理のみを行い、再実行はunlockAudioContext内で行う
     }
     
-    const BASE_URL = 'https://raw.githubusercontent.com/shiosoranami-studio/shiosoranami-sound-assets/main/voice';
+    const BASE_URL = 'https://raw.githubusercontent.com/NetaStudio/NamiriNoOto/main/sounds';
     
     // -----------------------------------------------------------
     // ★修正箇所: ファイル名部分をエンコードする
@@ -980,3 +980,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // (generateAppStructureでボタンがDOMに追加された後に実行する必要がある)
     updateAllVoiceButtonStates();
 });
+
