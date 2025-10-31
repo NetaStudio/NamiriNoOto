@@ -1049,8 +1049,7 @@ function showCategory(categoryId) {
 // 6. 音声再生ロジック
 // =================================================================
 /**
- * Web Audio API を使って AudioBuffer を再生する
- * (Web Audio APIのAudioBufferは、デコード済みの高速再生用データ)
+ * Web Audio API を使って AudioBuffer を再生する (変更なし)
  * @param {AudioBuffer} buffer - デコード済みの音声データ
  */
 function playAudioBuffer(buffer) {
@@ -1059,54 +1058,57 @@ function playAudioBuffer(buffer) {
         return;
     }
 
-    // 1. AudioBufferSourceNodeを作成（毎回新しいノードを作成するため同時再生可能）
+    // 毎回新しいノードを作成するため同時再生可能
     const source = audioContext.createBufferSource();
     source.buffer = buffer;
-
-    // 2. Destination (スピーカー) に接続
     source.connect(audioContext.destination);
-
-    // 3. 再生 (デコード済みのため、遅延はほぼゼロ)
     source.start(0);
 
-    // 4. クリーンアップ (再生終了時にノードを破棄)
     source.onended = () => {
         source.disconnect();
     };
 }
 
-
 /**
  * ボイスボタンがクリックされた時の処理 (async関数)
- * ★この関数がクリックイベント内で実行され、起動完了を待機します。
+ * ★デコード完了まで完全に待機し、音が途切れないことを保証します。
  * @param {string} soundPath - ボイスのユニークID (folder/file.wav)
  */
 async function handleVoiceButtonClick(soundPath) {
-    // 1. ★最重要★: AudioContextの起動が完了するまで処理を待機
-    // これにより、初回タップ時の起動遅延によるSEの途切れを排除します。
-    await ensureAudioContextStarted();
-
-    const audioBuffer = AUDIO_POOL.get(soundPath);
-    const fullPath = 'sounds/' + soundPath;
-
-    // 2. AudioBufferがプールに存在しない場合 (デコード未完了)
-    if (!audioBuffer) {
-        console.warn(`[Play] Fallback: AudioBuffer not ready for: ${soundPath}. Fetching and decoding now.`);
-
-        // デコードが間に合わなかった場合、その場で再度フェッチして再生を試みる
+    // 1. AudioContextの起動を試みる (初回クリック時に自動で実行)
+    // PC/モバイル問わず、ユーザー操作内で起動処理を完了させます。
+    if (audioContext.state === 'suspended') {
         try {
-            const buffer = await loadAndDecodeAudio(fullPath);
-            playAudioBuffer(buffer);
-            // 間に合わなかった AudioBuffer を次回のためにプールに保存
-            AUDIO_POOL.set(soundPath, buffer);
-        } catch (error) {
-            console.error(`[Error] Fallback play failed: ${soundPath}`, error);
+            // AudioContextの起動を試行し、完了を待つ
+            await audioContext.resume();
+        } catch (e) {
+            console.error("[AudioContext] Failed to resume:", e);
         }
-
-        return;
     }
 
-    // 3. AudioBufferが完全に揃っている場合
+    // 2. AudioBufferの状態を確認
+    let audioBuffer = AUDIO_POOL.get(soundPath);
+    const fullPath = 'sounds/' + soundPath;
+
+    // 3. AudioBufferが存在しない場合 (初回クリック時のデコード未完了)
+    if (!audioBuffer) {
+        console.warn(`[Play] Delaying: AudioBuffer not ready for: ${soundPath}. Fetching and decoding now.`);
+
+        // ★最重要修正★: AudioBufferのデコード完了を完全に待機する (遅延を許容して途切れを防ぐ)
+        try {
+            // loadAndDecodeAudioは非同期でデコードを行うため、完了まで待機
+            audioBuffer = await loadAndDecodeAudio(fullPath);
+            // 完了したAudioBufferをプールに保存 (次回以降は高速再生)
+            AUDIO_POOL.set(soundPath, audioBuffer);
+            console.log(`[Play] Ready after delay: ${soundPath}`);
+        } catch (error) {
+            console.error(`[Error] Decoding failed: ${soundPath}`, error);
+            return;
+        }
+    }
+
+    // 4. AudioBufferが完全に揃っている場合
+    // デコード完了を待った後のため、ここでの再生は頭切れしないことが保証されます。
     console.log(`[Play] Success: Playing AudioBuffer for: ${soundPath}`);
     playAudioBuffer(audioBuffer);
 }
