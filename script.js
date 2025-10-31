@@ -273,12 +273,10 @@ function preloadCategoryVoices(categoryId) {
 
             // Audioの準備完了（loadeddata）を待つPromiseを作成
             const loadPromise = new Promise(resolve => {
-                // loadeddataイベント（再生準備完了）が発生したら解決
                 audio.addEventListener('loadeddata', () => {
                     resolve();
                 }, { once: true });
 
-                // ロード失敗時も処理をブロックしない
                 audio.addEventListener('error', (e) => {
                     console.error(`[Load Error] Failed to load ${voiceId}:`, e);
                     resolve();
@@ -286,6 +284,14 @@ function preloadCategoryVoices(categoryId) {
 
                 // ロードを開始
                 audio.load();
+
+                // ★新規追加: ミュートして強制的に再生を試みる
+                // これにより、モバイル環境でのデコード/バッファリングを強制的に促す
+                audio.muted = true;
+                audio.play().catch(error => {
+                    // play()がブロックされても無視（目的はデコードの開始）
+                });
+
             });
             loadPromises.push(loadPromise);
         }
@@ -966,23 +972,19 @@ function showCategory(categoryId) {
  * ボイスボタンがクリックされた時の処理
  * @param {string} soundPath - ボイスのユニークID (folder/file.wav)
  */
-function handleVoiceButtonClick(soundPath) {
+    function handleVoiceButtonClick(soundPath) {
     const masterAudio = AUDIO_POOL.get(soundPath);
     const fullPath = 'sounds/' + soundPath;
 
-    // HTMLMediaElement.readyState が 4 (HAVE_ENOUGH_DATA) ではない場合、
-    // まだデータが十分に揃っておらず、頭切れの原因となる。
-    // そのため、新規インスタンス作成 (playAudioDirectly) にフォールバックする。
     if (!masterAudio || masterAudio.readyState < 4) {
         // プールにない場合、またはプールにあるがデータが不完全な場合
         // -> ユーザー操作内で新規インスタンスを作成し、即座にplay()
         console.log(`[Play] Fallback: Playing new Audio instance for: ${soundPath}. ReadyState: ${masterAudio ? masterAudio.readyState : 'N/A'}`);
         playAudioDirectly(fullPath);
 
-        // ★重要: 不完全だったマスターインスタンスのロードを強制的に開始し直す
-        if (masterAudio) {
-            masterAudio.load();
-        }
+        // ★削除: masterAudio.load() は、ロードをリセットする可能性があるため削除
+        // masterAudio.load() は既に preloadCategoryVoices 内で試行されている
+
         return;
     }
 
