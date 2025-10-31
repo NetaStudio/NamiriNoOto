@@ -238,20 +238,43 @@ const VOICE_DATA =
 ];
 
 
-/** 事前ロードされた Audio インスタンスを保持するマップ */
+// -----------------------------------------------------------------
+// ★★★ [Web Audio API対応] オーディオプールと遅延ロードの管理 ★★★
+// -----------------------------------------------------------------
+
+/** Web Audio API のコンテキスト */
+const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+/** 事前ロードされた AudioBuffer (デコード済み音声データ) を保持するマップ */
 const AUDIO_POOL = new Map();
 /** ロード済みカテゴリIDを保持するセット */
 const loadedCategories = new Set();
 
 
 /**
- * 指定されたカテゴリの音声ファイルのみをプールに準備し、準備完了を待つ
+ * Web Audio API を使って音声ファイルをフェッチし、デコードする
+ * @param {string} url - 音声ファイルのURL
+ * @returns {Promise<AudioBuffer>} - デコード済みの AudioBuffer
+ */
+async function loadAndDecodeAudio(url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    // デコード処理は非同期で実行され、デコード完了を保証
+    return audioContext.decodeAudioData(arrayBuffer);
+}
+
+
+
+/**
+ * 指定されたカテゴリの音声ファイルをロードし、AudioBufferとしてプールに準備する
  * @param {string} categoryId - ロード対象のカテゴリID
- * @returns {Promise<void>} - 全ての音声が 'loadeddata' 状態になったら解決するPromise
+ * @returns {Promise<void>} - 全ての音声がデコード完了したら解決するPromise
  */
 function preloadCategoryVoices(categoryId) {
     if (loadedCategories.has(categoryId)) {
-        return Promise.resolve(); // 既にロード済みなら即座に解決
+        return Promise.resolve();
     }
 
     const category = VOICE_DATA.find(c => c.id === categoryId);
@@ -260,7 +283,7 @@ function preloadCategoryVoices(categoryId) {
         return Promise.resolve();
     }
 
-    console.log(`[Lazy Load] Starting audio preparation for: ${category.name}`);
+    console.log(`[Lazy Load] Starting Web Audio Buffer preparation for: ${category.name}`);
 
     const loadPromises = [];
 
@@ -268,39 +291,25 @@ function preloadCategoryVoices(categoryId) {
         const voiceId = `${category.folder}/${voice.file}`;
         if (!AUDIO_POOL.has(voiceId)) {
             const fullPath = 'sounds/' + voiceId;
-            const audio = new Audio(fullPath);
-            AUDIO_POOL.set(voiceId, audio);
 
-            // Audioの準備完了（loadeddata）を待つPromiseを作成
-            const loadPromise = new Promise(resolve => {
-                audio.addEventListener('loadeddata', () => {
-                    resolve();
-                }, { once: true });
-
-                audio.addEventListener('error', (e) => {
-                    console.error(`[Load Error] Failed to load ${voiceId}:`, e);
-                    resolve();
-                }, { once: true });
-
-                // ロードを開始
-                audio.load();
-
-                // ★新規追加: ミュートして強制的に再生を試みる
-                // これにより、モバイル環境でのデコード/バッファリングを強制的に促す
-                audio.muted = true;
-                audio.play().catch(error => {
-                    // play()がブロックされても無視（目的はデコードの開始）
+            // AudioBufferのデコード完了を待つPromiseを作成
+            const loadPromise = loadAndDecodeAudio(fullPath)
+                .then(buffer => {
+                    // デコード完了した AudioBuffer をプールに保存
+                    AUDIO_POOL.set(voiceId, buffer);
+                })
+                .catch(e => {
+                    console.error(`[Decode Error] Failed to decode ${voiceId}:`, e);
                 });
 
-            });
             loadPromises.push(loadPromise);
         }
     });
 
-    // 全ての音声の準備が完了するのを待つPromiseを返す
+    // 全てのデコードが完了するのを待つ
     return Promise.all(loadPromises).then(() => {
         loadedCategories.add(categoryId);
-        console.log(`[Lazy Load] All audio prepared for: ${category.name}.`);
+        console.log(`[Lazy Load] All audio buffers prepared for: ${category.name}.`);
     }).catch(e => {
         console.error(`[Load Error] Failed to prepare all audio for: ${category.name}`, e);
         loadedCategories.add(categoryId);
@@ -969,63 +978,68 @@ function showCategory(categoryId) {
 // 6. 音声再生ロジック
 // =================================================================
 /**
+ * Web Audio API を使って AudioBuffer を再生する
+ * @param {AudioBuffer} buffer - デコード済みの音声データ
+ */
+function playAudioBuffer(buffer) {
+    if (!buffer) {
+        console.error("[Play Error] AudioBuffer is not available.");
+        return;
+    }
+
+    // 1. AudioBufferSourceNodeを作成
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+
+    // 2. Destination (スピーカー) に接続
+    source.connect(audioContext.destination);
+
+    // 3. 再生 (遅延はほぼゼロ)
+    source.start(0); // 0秒から再生開始
+
+    // 4. クリーンアップ (再生終了時にノードを破棄)
+    source.onended = () => {
+        source.disconnect();
+    };
+}
+
+/**
  * ボイスボタンがクリックされた時の処理
  * @param {string} soundPath - ボイスのユニークID (folder/file.wav)
  */
-    function handleVoiceButtonClick(soundPath) {
-    const masterAudio = AUDIO_POOL.get(soundPath);
+function handleVoiceButtonClick(soundPath) {
+    // Web Audio APIのコンテキストがサスペンドされている場合、再開を試みる
+    if (audioContext.state === 'suspended') {
+        audioContext.resume().catch(e => {
+            console.error("Failed to resume AudioContext:", e);
+        });
+    }
+
+    const audioBuffer = AUDIO_POOL.get(soundPath);
     const fullPath = 'sounds/' + soundPath;
 
-    if (!masterAudio || masterAudio.readyState < 4) {
-        // プールにない場合、またはプールにあるがデータが不完全な場合
-        // -> ユーザー操作内で新規インスタンスを作成し、即座にplay()
-        console.log(`[Play] Fallback: Playing new Audio instance for: ${soundPath}. ReadyState: ${masterAudio ? masterAudio.readyState : 'N/A'}`);
-        playAudioDirectly(fullPath);
+    // 1. AudioBufferがプールに存在しない場合 (デコード未完了)
+    if (!audioBuffer) {
+        console.warn(`[Play] Fallback: AudioBuffer not ready for: ${soundPath}. Retrying with fetch/decode.`);
 
-        // ★削除: masterAudio.load() は、ロードをリセットする可能性があるため削除
-        // masterAudio.load() は既に preloadCategoryVoices 内で試行されている
+        // ★重要: データが間に合わなかった場合、その場で再度フェッチして再生
+        // これも非同期なので、初回は僅かな遅延があるが、最も確実
+        loadAndDecodeAudio(fullPath)
+            .then(buffer => {
+                playAudioBuffer(buffer);
+                // 間に合わなかった AudioBuffer を次回のためにプールに保存
+                AUDIO_POOL.set(soundPath, buffer);
+            })
+            .catch(error => {
+                console.error(`[Error] Fallback play failed: ${soundPath}`, error);
+            });
 
         return;
     }
 
-    // データが完全に揃っている場合 (readyState === 4) のみクローンして再生
-    console.log(`[Play] Success: Playing cloned instance for: ${soundPath}. ReadyState: ${masterAudio.readyState}`);
-    const audioToPlay = masterAudio.cloneNode(true);
-
-    // 現在の再生位置をリセット
-    audioToPlay.currentTime = 0;
-
-    audioToPlay.play().catch(error => {
-        // モバイルポリシー違反の場合のフォールバック
-        if (error.name === "NotAllowedError" || error.name === "AbortError") {
-             console.warn(`[Warning] Auto-play blocked. Retrying with a new Audio instance in the same click event.`);
-             playAudioDirectly(fullPath);
-        } else {
-             console.error(`[Error] Failed to play audio: ${soundPath}`, error);
-        }
-    });
-
-    // クリーンアップ
-    audioToPlay.addEventListener('ended', () => {
-        audioToPlay.remove();
-    });
-}
-
-/**
- * 新しい Audio インスタンスを作成して再生する (フォールバック & ブロック解除用)
- * (変更なし)
- * @param {string} fullPath - 音声ファイルのフルパス
- */
-function playAudioDirectly(fullPath) {
-    const audio = new Audio(fullPath);
-
-    audio.play().catch(error => {
-        console.error(`[Error] Direct play failed for: ${fullPath}`, error);
-    });
-
-    audio.addEventListener('ended', () => {
-        audio.remove();
-    });
+    // 2. AudioBufferが完全に揃っている場合
+    console.log(`[Play] Success: Playing AudioBuffer for: ${soundPath}`);
+    playAudioBuffer(audioBuffer);
 }
 
 
