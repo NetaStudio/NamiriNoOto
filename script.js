@@ -677,20 +677,27 @@ function clearFavorites() {
  * @param {boolean} isDraggable - ドラッグ可能かどうか
  */
 function createVoiceButton(categoryFolder, voice, isDraggable = false) {
-    // ... (createVoiceButton の中身は変更なし) ...
     const voiceId = `${categoryFolder}/${voice.file}`;
     const button = document.createElement('button');
     // 音声ボタンの縦幅を調整
     button.className = `voice-button flex items-center justify-between p-3 rounded-xl shadow-lg transition-all duration-200 ease-in-out`;
     button.setAttribute('data-sound', voiceId);
     button.setAttribute('data-text', voice.text);
-    // ボタン全体でのクリックを音声再生に割り当て
-    button.setAttribute('onclick', `handleVoiceButtonClick('${voiceId}')`);
+
+    // ★修正点1: インラインonclickを削除
+    // button.setAttribute('onclick', `handleVoiceButtonClick('${voiceId}')`);
 
     // ドラッグ＆ドロップ用属性 (メモカテゴリでのみ有効)
     if (isDraggable) {
         button.setAttribute('draggable', 'true');
     }
+
+    // ★修正点2: addEventListenerで非同期関数を安全に呼び出す
+    button.addEventListener('click', () => {
+        // handleVoiceButtonClickはasyncなので、リスナー内でawaitは不要だが、
+        // ブラウザがPromiseの完了を認識するようになる。
+        handleVoiceButtonClick(voiceId);
+    });
 
     // テキストコンテンツ
     const textContent = document.createElement('span');
@@ -1043,6 +1050,7 @@ function showCategory(categoryId) {
 // =================================================================
 /**
  * Web Audio API を使って AudioBuffer を再生する
+ * (Web Audio APIのAudioBufferは、デコード済みの高速再生用データ)
  * @param {AudioBuffer} buffer - デコード済みの音声データ
  */
 function playAudioBuffer(buffer) {
@@ -1051,15 +1059,15 @@ function playAudioBuffer(buffer) {
         return;
     }
 
-    // 1. AudioBufferSourceNodeを作成
+    // 1. AudioBufferSourceNodeを作成（毎回新しいノードを作成するため同時再生可能）
     const source = audioContext.createBufferSource();
     source.buffer = buffer;
 
     // 2. Destination (スピーカー) に接続
     source.connect(audioContext.destination);
 
-    // 3. 再生 (遅延はほぼゼロ)
-    source.start(0); // 0秒から再生開始
+    // 3. 再生 (デコード済みのため、遅延はほぼゼロ)
+    source.start(0);
 
     // 4. クリーンアップ (再生終了時にノードを破棄)
     source.onended = () => {
@@ -1067,31 +1075,30 @@ function playAudioBuffer(buffer) {
     };
 }
 
+
 /**
- * ボイスボタンがクリックされた時の処理
- * @param {string} soundPath - ボイスのユニークID (folder/file.wav)
- */
-/**
- * ボイスボタンがクリックされた時の処理 (async関数に変更)
+ * ボイスボタンがクリックされた時の処理 (async関数)
+ * ★この関数がクリックイベント内で実行され、起動完了を待機します。
  * @param {string} soundPath - ボイスのユニークID (folder/file.wav)
  */
 async function handleVoiceButtonClick(soundPath) {
-    // ★修正点1: 最初にAudioContextの起動が完了するまで待つ
-    // これにより、初回タップ時の途切れの原因を排除
+    // 1. ★最重要★: AudioContextの起動が完了するまで処理を待機
+    // これにより、初回タップ時の起動遅延によるSEの途切れを排除します。
     await ensureAudioContextStarted();
 
     const audioBuffer = AUDIO_POOL.get(soundPath);
     const fullPath = 'sounds/' + soundPath;
 
-    // 1. AudioBufferがプールに存在しない場合 (デコード未完了)
+    // 2. AudioBufferがプールに存在しない場合 (デコード未完了)
     if (!audioBuffer) {
         console.warn(`[Play] Fallback: AudioBuffer not ready for: ${soundPath}. Fetching and decoding now.`);
 
-        // コンテキストの起動は保証されたので、あとはデコードが間に合えばOK
+        // デコードが間に合わなかった場合、その場で再度フェッチして再生を試みる
         try {
             const buffer = await loadAndDecodeAudio(fullPath);
             playAudioBuffer(buffer);
-            AUDIO_POOL.set(soundPath, buffer); // 次回のために保存
+            // 間に合わなかった AudioBuffer を次回のためにプールに保存
+            AUDIO_POOL.set(soundPath, buffer);
         } catch (error) {
             console.error(`[Error] Fallback play failed: ${soundPath}`, error);
         }
@@ -1099,21 +1106,50 @@ async function handleVoiceButtonClick(soundPath) {
         return;
     }
 
-    // 2. AudioBufferが完全に揃っている場合
+    // 3. AudioBufferが完全に揃っている場合
     console.log(`[Play] Success: Playing AudioBuffer for: ${soundPath}`);
     playAudioBuffer(audioBuffer);
 }
 
+// =================================================================
+// [新規追加] AudioContextの先行起動ロジック
+// =================================================================
+
+/**
+ * 画面上の最初のタッチ/クリックで AudioContext を確実に起動させるためのリスナーを設定する
+ */
+function attachFirstTouchActivator() {
+    const activateContext = async () => {
+        // AudioContextの起動を試行（前回のensureAudioContextStarted()を呼び出す）
+        // 起動が成功するまで待機
+        await ensureAudioContextStarted();
+
+        // 起動が完了したら、このリスナーは役目を終えたので削除
+        document.body.removeEventListener('click', activateContext);
+        document.body.removeEventListener('touchstart', activateContext);
+        document.body.removeEventListener('mousedown', activateContext); // 念のためPC用のイベントも追加
+
+        console.log("[INIT] First touch activation completed. Audio is ready.");
+    };
+
+    // ユーザーの最初の操作を確実に捉えるために、body全体にリスナーを設定
+    // ※ { once: true } は一度実行したら自動で削除されますが、念のため手動での remove も用意
+    document.body.addEventListener('click', activateContext, { once: true });
+    document.body.addEventListener('touchstart', activateContext, { once: true });
+    document.body.addEventListener('mousedown', activateContext, { once: true });
+}
 
 // =================================================================
 // 7. 初期化 (DOMContentLoadedイベントハンドラ)
 // =================================================================
 // DOMのロード完了を待ってから実行
 document.addEventListener('DOMContentLoaded', () => {
-    loadFavoritesFromLocalStorage(); // 最初にローカルストレージからメモを読み込む
+    loadFavoritesFromLocalStorage();
     generateAppStructure(VOICE_DATA);
 
     // 初期化時に全てのボタンの星の状態を同期
-    // (注: 初回はメモカテゴリ以外はボタンがないが、showCategoryで生成されるときに更新されるため問題なし)
     updateAllVoiceButtonStates();
+
+    // ★新規追加: ページの準備ができたら、最初のタッチでAudioContextを起動するリスナーを設定
+    attachFirstTouchActivator();
 });
