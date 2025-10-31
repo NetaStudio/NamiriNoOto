@@ -883,7 +883,20 @@ function playVoice(voiceId) {
     }
     
     const BASE_URL = 'https://raw.githubusercontent.com/shiosoranami-studio/shiosoranami-sound-assets/main/voice';
-    const fullPath = `${BASE_URL}/${voiceId}`;
+    
+    // -----------------------------------------------------------
+    // ★修正箇所: ファイル名部分をエンコードする
+    // voiceIdは "folder/file.mp3" の形式なので、パスとファイル名に分割して処理
+    const parts = voiceId.split('/');
+    const folder = parts[0];
+    const fileName = parts[1];
+    
+    // ファイル名をエンコード
+    const encodedFileName = encodeURIComponent(fileName);
+    
+    // エンコードされたファイル名を使用してフルパスを再構築
+    const fullPath = `${BASE_URL}/${folder}/${encodedFileName}`;
+    // -----------------------------------------------------------
     
     // Web Audio APIを使わず、シンプルなHTML5 Audioで再生する (ロードの複雑さを避けるため)
     playAudioWithRetry(fullPath);
