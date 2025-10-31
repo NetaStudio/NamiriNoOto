@@ -323,16 +323,16 @@ let draggedItem = null;
     // 新しい位置に要素を挿入
     favorites.splice(insertionIndex, 0, movedItem);
 
-    // UIを再レンダリング (メモカテゴリの再描画)
-    updateFavoriteCategory(); 
-    // 現在の表示をメモカテゴリに切り替える
-    showCategory('category-favorites'); 
-    // 全てのボタンの星アイコンの状態を更新 (追加: ここで全ボタンの状態を更新することで、星の非表示問題を解決)
-    updateAllVoiceButtonStates(); 
-
     // ローカルストレージに保存
     saveFavoritesToLocalStorage();
 
+    // UIを再レンダリング (メモカテゴリの再描画)
+    updateFavoriteCategory(); 
+    // 全てのボタンの星アイコンの状態を更新 (メモカテゴリの再描画後に実行することが重要)
+    updateAllVoiceButtonStates(); 
+    // 現在の表示をメモカテゴリに切り替える
+    showCategory('category-favorites'); 
+    
     // 状態をリセット
     resetDragState();
 }
@@ -392,40 +392,51 @@ function toggleFavorite(voiceId, event) {
     }
 
     saveFavoritesToLocalStorage();
-    // 全てのカテゴリボタンの状態を更新
-    updateAllVoiceButtonStates();
-    // メモカテゴリを更新
+
+    // 1. メモカテゴリを更新・再描画する
     updateFavoriteCategory();
 
-    // もしメモカテゴリが表示中なら再表示して更新を反映
+    // 2. 全てのカテゴリボタンの状態を更新 (再描画されたDOM要素に対して行う)
+    updateAllVoiceButtonStates();
+
+    // 3. もしメモカテゴリが表示中なら、表示中のセクションを強制的に更新する
     const activeLink = document.querySelector('.category-link.selected');
     if (activeLink && activeLink.getAttribute('data-category-id') === 'category-favorites') {
-        showCategory('category-favorites');
+        // メモカテゴリが再描画されたので、アクティブ表示を維持するために再実行する
+        showCategory('category-favorites'); 
     }
 }
 
 /**
  * 全てのボイスボタンのメモアイコンの状態を更新する
+ * (メモカテゴリ再描画後に呼び出すことが重要)
  */
 function updateAllVoiceButtonStates() {
+    // 現在DOMに存在する全ての.voice-button要素を取得
     const allVoiceButtons = document.querySelectorAll('.voice-button');
 
     allVoiceButtons.forEach(button => {
         const voiceId = button.getAttribute('data-sound');
+        // .voice-button内に .favorite-icon が含まれていることを確認
         const iconElement = button.querySelector('.favorite-icon');
 
         if (iconElement) {
             const isFav = isFavorite(voiceId);
 
             if (isFav) {
+                // お気に入り登録済みの場合: ★ (塗りつぶし)
                 iconElement.textContent = '★';
                 iconElement.classList.remove('text-gray-300', 'hover:text-yellow-400');
                 iconElement.classList.add('text-yellow-400', 'hover:text-yellow-500');
             } else {
+                // 未登録の場合: ☆ (枠線)
                 iconElement.textContent = '☆';
                 iconElement.classList.remove('text-yellow-400', 'hover:text-yellow-500');
                 iconElement.classList.add('text-gray-300', 'hover:text-yellow-400');
             }
+        } else {
+            // アイコン要素がない場合は、コンポーネントの作成に問題がある可能性
+            console.warn(`[Warning] Favorite icon element not found for voiceId: ${voiceId}`);
         }
     });
 }
@@ -469,9 +480,11 @@ function clearFavorites() {
 
     favorites = [];
     saveFavoritesToLocalStorage();
-    updateAllVoiceButtonStates();
+    
+    // 順序を入れ替えてから状態を更新
     updateFavoriteCategory();
-
+    updateAllVoiceButtonStates();
+    
     const activeLink = document.querySelector('.category-link.selected');
     if (activeLink && activeLink.getAttribute('data-category-id') === 'category-favorites') {
         // メモカテゴリが表示中なら、空の状態で再表示
@@ -513,6 +526,11 @@ function createVoiceButton(categoryFolder, voice, isDraggable = false) {
     iconSpan.setAttribute('onclick', `toggleFavorite('${voiceId}', event)`);
 
     button.appendChild(iconSpan);
+    
+    // ⚠️ 初期作成時にはアイコンの状態を設定しない。
+    // 全てのボタンがDOMに追加された後、updateAllVoiceButtonStatesでまとめて設定する。
+    // これにより、初回読み込み時も状態が統一されます。
+
     return button;
 }
 
@@ -568,8 +586,8 @@ function createFavoriteCategorySection(favoriteVoices) {
     
     const enTitle = document.createElement('span');
     enTitle.textContent = `(Bookmark)`;
-    enTitle.className = 'text-lg font-normal text-gray-400'; 
-    titleContainer.appendChild(enTitle);
+    enName.className = 'text-lg font-normal text-gray-400'; 
+    titleContainer.appendChild(enName);
     
     section.appendChild(titleContainer);
 
@@ -588,6 +606,7 @@ function createFavoriteCategorySection(favoriteVoices) {
         section.appendChild(grid);
 
         favoriteVoices.forEach(item => {
+            // メモカテゴリではドラッグ可能にする
             grid.appendChild(createVoiceButton(item.folder, item.voice, true));
         });
 
@@ -600,18 +619,21 @@ function createFavoriteCategorySection(favoriteVoices) {
 
 /**
  * メモカテゴリの内容を更新・再描画する
+ * (既存のメモカテゴリセクションを削除し、新しいセクションに置き換える)
  */
 function updateFavoriteCategory() {
     const mainContent = document.getElementById('main-content');
     const oldFavoriteSection = document.getElementById('category-favorites');
-
-    if (oldFavoriteSection) {
-        mainContent.removeChild(oldFavoriteSection);
-    }
-
     const favoriteVoices = getFavoriteVoices();
     const newFavoriteSection = createFavoriteCategorySection(favoriteVoices);
-    mainContent.appendChild(newFavoriteSection);
+
+    if (oldFavoriteSection) {
+        // 古い要素を新しい要素で置き換える
+        mainContent.replaceChild(newFavoriteSection, oldFavoriteSection);
+    } else {
+        // 初回ロード時や要素がまだない場合
+        mainContent.appendChild(newFavoriteSection);
+    }
 }
 
 /**
@@ -952,5 +974,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadFavoritesFromLocalStorage(); 
     generateAppStructure(VOICE_DATA);
+    // 初回ロード完了後に全てのボタンの状態を同期
     updateAllVoiceButtonStates();
 });
