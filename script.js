@@ -138,6 +138,7 @@ const VOICE_DATA =
             { text: "クソ野郎", file: "クソ野郎.mp3" },
             { text: "舐めんじゃねーぞ", file: "舐めんじゃねーぞ.mp3" },
             { text: "ふざけんな", file: "ふざけんな.mp3" },
+            { text: "バッカじゃないの", file: "バッカじゃないの.mp3" },
             { text: "知らないんだから", file: "知らないんだから.mp3" },
             { text: "不機嫌になってきたなぁ", file: "不機嫌になってきたなぁ.mp3" },
             { text: "そういうこと考えてんだ", file: "そういうこと考えてんだ.mp3" },
@@ -1168,4 +1169,5 @@ document.addEventListener('DOMContentLoaded', () => {
     // ★新規追加: ページの準備ができたら、最初のタッチでAudioContextを起動するリスナーを設定
     attachFirstTouchActivator();
 });
+
 
