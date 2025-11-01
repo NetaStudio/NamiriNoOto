@@ -138,9 +138,14 @@ const VOICE_DATA =
             { text: "クソ野郎", file: "クソ野郎.mp3" },
             { text: "舐めんじゃねーぞ", file: "舐めんじゃねーぞ.mp3" },
             { text: "ふざけんな", file: "ふざけんな.mp3" },
+            { text: "ボケ", file: "ボケ.mp3" },
             { text: "バッカじゃないの", file: "バッカじゃないの.mp3" },
+            { text: "バカ", file: "バカ.mp3" },
+            { text: "バカ謝れ", file: "バカ謝れ.mp3" },
+            { text: "ボケ", file: "ボケ.mp3" },
             { text: "知らないんだから", file: "知らないんだから.mp3" },
             { text: "不機嫌になってきたなぁ", file: "不機嫌になってきたなぁ.mp3" },
+            { text: "腹立つな", file: "腹立つな.mp3" },
             { text: "そういうこと考えてんだ", file: "そういうこと考えてんだ.mp3" },
         ]
     },
@@ -153,12 +158,13 @@ const VOICE_DATA =
         [
             { text: "悲しいよ", file: "悲しいよ.mp3" },
             { text: "悲しすぎるよ", file: "悲しすぎるよ.mp3" },
-            { text: "もうバカ！", file: "もうバカ！.mp3" },
             { text: "この有様でした", file: "この有様でした.mp3" },
             { text: "うぇ～へへへ", file: "うぇ～へへへ.mp3" },
+            { text: "もうバカ！", file: "もうバカ！.mp3" },
             { text: "バカ…", file: "バカ….mp3" },
             { text: "ク～ッソ", file: "ク～ッソ.mp3" },
             { text: "ハァ", file: "ハァ.mp3" },
+            { text: "アアア\"ア\"", file: "アアアアア.mp3" },
             { text: "不安だな", file: "不安だな.mp3" },
             { text: "すまん", file: "すまん.mp3" },
             { text: "気付いてませんでした", file: "気付いてませんでした.mp3" },
@@ -1169,5 +1175,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // ★新規追加: ページの準備ができたら、最初のタッチでAudioContextを起動するリスナーを設定
     attachFirstTouchActivator();
 });
+
 
 
