@@ -110,7 +110,10 @@ const VOICE_DATA =
             { text: "いえーい", file: "いえーい.mp3" },
             { text: "よしよしよし", file: "よしよしよし.mp3" },
             { text: "やったーはははは", file: "やったーはははは.mp3" },
+            { text: "嬉しい", file: "嬉しい.mp3" },
             { text: "嬉しいな～ななな～な", file: "嬉しいな～ななな～な.mp3" },
+            { text: "バカ／／", file: "バカ／／.mp3" },
+            { text: "バーカ／／", file: "バーカ／／.mp3" },
             { text: "ばーーーーか", file: "ばーーーーか.mp3" },
             { text: "まじっすか", file: "まじっすか.mp3" },
             { text: "満足かな", file: "満足かな.mp3" },
@@ -152,6 +155,7 @@ const VOICE_DATA =
             { text: "もうバカ！", file: "もうバカ！.mp3" },
             { text: "この有様でした", file: "この有様でした.mp3" },
             { text: "うぇ～へへへ", file: "うぇ～へへへ.mp3" },
+            { text: "バカ…", file: "バカ….mp3" },
             { text: "ク～ッソ", file: "ク～ッソ.mp3" },
             { text: "ハァ", file: "ハァ.mp3" },
             { text: "不安だな", file: "不安だな.mp3" },
@@ -172,6 +176,9 @@ const VOICE_DATA =
             { text: "かはははは", file: "かはははは.mp3" },
             { text: "ふふはは", file: "ふふはは.mp3" },
             { text: "んふふふふ", file: "んふふふふ.mp3" },
+            { text: "ハ、ハ、ハハハ", file: "ハ、ハ、ハハハ.mp3" },
+            { text: "ふっふははは", file: "ふっふははは.mp3" },
+            { text: "バカーーー！", file: "バカーーー！.mp3" },
             { text: "楽しい航海にしてやろうじゃん", file: "楽しい航海にしてやろうじゃん.mp3" },
         ]
     },
@@ -189,6 +196,7 @@ const VOICE_DATA =
             { text: "残念でした", file: "残念でした.mp3" },
             { text: "ごめ～んね？", file: "ごめ～んね？.mp3" },
             { text: "ばーか", file: "ばーか.mp3" },
+            { text: "バカじゃ～ん", file: "バカじゃ～ん.mp3" },
             { text: "おい見たか", file: "おい見たか.mp3" },
             { text: "まぁまぁまぁまぁ", file: "まぁまぁまぁまぁ.mp3" },
             { text: "良い子だね？", file: "良い子だね？.mp3" },
@@ -213,6 +221,22 @@ const VOICE_DATA =
             { text: "えっほえっほ", file: "えっほえっほ.mp3" },
             { text: "じーーーー", file: "じーーーー.mp3" },
             { text: "むにゅ", file: "むにゅ.mp3" },
+            { text: "キラキラキラキラ", file: "キラキラキラキラ.mp3" },
+            { text: "バンバンバンバン", file: "バンバンバンバン.mp3" },
+            { text: "ジュー", file: "ジュー.mp3" },
+            { text: "ズキューン", file: "ズキューン.mp3" },
+            { text: "タララララン", file: "タララララン.mp3" },
+            { text: "チーン", file: "チーン.mp3" },
+            { text: "トゥンク", file: "トゥンク.mp3" },
+            { text: "ドシャーン", file: "ドシャーン.mp3" },
+            { text: "ドッキュンx4", file: "ドッキュンx4.mp3" },
+            { text: "バ～ン", file: "バ～ン.mp3" },
+            { text: "バーン", file: "バーン.mp3" },
+            { text: "パパパパーン", file: "パパパパーン.mp3" },
+            { text: "バラルルルル", file: "バラルルルル.mp3" },
+            { text: "パン！", file: "パン！.mp3" },
+            { text: "ブ～", file: "ブ～.mp3" },
+            { text: "ボン", file: "ボン.mp3" },
         ]
     },
     {
@@ -233,6 +257,8 @@ const VOICE_DATA =
             { text: "今のなんか語弊あったかなぁ", file: "今のなんか語弊あったかなぁ.mp3" },
             { text: "何見てんのセクハラ", file: "何見てんのセクハラ.mp3" },
             { text: "忘れろビーム", file: "忘れろビーム.mp3" },
+            { text: "なみりウィンク", file: "なみりウィンク.mp3" },
+            { text: "責任とって下さい", file: "責任とって下さい.mp3" },
         ]
     }
 ];
@@ -1142,3 +1168,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // ★新規追加: ページの準備ができたら、最初のタッチでAudioContextを起動するリスナーを設定
     attachFirstTouchActivator();
 });
+
