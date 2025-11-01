@@ -112,8 +112,8 @@ const VOICE_DATA =
             { text: "やったーはははは", file: "やったーはははは.mp3" },
             { text: "嬉しい", file: "嬉しい.mp3" },
             { text: "嬉しいな～ななな～な", file: "嬉しいな～ななな～な.mp3" },
-            { text: "バカ／／", file: "バカ／／.mp3" },
-            { text: "バーカ／／", file: "バーカ／／.mp3" },
+            { text: "バカ//", file: "バカ／／.mp3" },
+            { text: "バーカ//", file: "バーカ／／.mp3" },
             { text: "ばーーーーか", file: "ばーーーーか.mp3" },
             { text: "まじっすか", file: "まじっすか.mp3" },
             { text: "満足かな", file: "満足かな.mp3" },
@@ -1175,6 +1175,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ★新規追加: ページの準備ができたら、最初のタッチでAudioContextを起動するリスナーを設定
     attachFirstTouchActivator();
 });
+
 
 
 
