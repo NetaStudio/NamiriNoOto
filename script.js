@@ -192,7 +192,7 @@ const VOICE_DATA =
         id: "category-inciting",
         name: "煽り",
         en_name: "Inciting",
-        folder: "11_inciting",
+        folder: "09_inciting",
         voices:
         [
             { text: "へ～", file: "へ～.mp3" },
@@ -207,6 +207,45 @@ const VOICE_DATA =
             { text: "まぁまぁまぁまぁ", file: "まぁまぁまぁまぁ.mp3" },
             { text: "良い子だね？", file: "良い子だね？.mp3" },
             { text: "キャー怖～いw", file: "キャー怖～いw.mp3" },
+        ]
+    },
+    {
+        id: "category-animal",
+        name: "動物",
+        en_name: "Animal",
+        folder: "11_animal",
+        voices:
+        [
+            { text: "あひるんるん", file: "へ～.mp3" },
+            { text: "ひつじろーる", file: "お～い.mp3" },
+            { text: "とんがりやぎこーん", file: "そんなこともできないの？.mp3" },
+            { text: "おれんじきつねのきらきらきらーん", file: "ざーーーこ.mp3" },
+            { text: "ぺんぺん・ど", file: "残念でした.mp3" },
+            { text: "セイウチっち", file: "ごめ～んね？.mp3" },
+            { text: "ほわいとくまたろう", file: "ばーか.mp3" },
+            { text: "職トナカイ", file: "バカじゃ～ん.mp3" },
+            { text: "ぴーちゃん", file: "おい見たか.mp3" },
+            { text: "みんちゃん", file: "まぁまぁまぁまぁ.mp3" },
+            { text: "フータロー", file: "良い子だね？.mp3" },
+            { text: "わっしっし", file: "キャー怖～いw.mp3" },
+            { text: "キング", file: "ばーか.mp3" },
+            { text: "さいさい", file: "バカじゃ～ん.mp3" },
+            { text: "ぱおぞう", file: "おい見たか.mp3" },
+            { text: "かばたろう", file: "まぁまぁまぁまぁ.mp3" },
+            { text: "くままる", file: "良い子だね？.mp3" },
+            { text: "とらちゃん", file: "キャー怖～いw.mp3" },
+            { text: "どんきー", file: "良い子だね？.mp3" },
+            { text: "ぱんぞう", file: "キャー怖～いw.mp3" },
+            { text: "もんちゃん", file: "ばーか.mp3" },
+            { text: "ぴょこたろう", file: "バカじゃ～ん.mp3" },
+            { text: "ちょこ", file: "おい見たか.mp3" },
+            { text: "くろ", file: "まぁまぁまぁまぁ.mp3" },
+            { text: "うさたん", file: "良い子だね？.mp3" },
+            { text: "めろんちゃん", file: "キャー怖～いw.mp3" },
+            { text: "オレノダイヤモンド", file: "おい見たか.mp3" },
+            { text: "もーもーたろう", file: "まぁまぁまぁまぁ.mp3" },
+            { text: "ぷくたろう", file: "良い子だね？.mp3" },
+            { text: "でんでん", file: "キャー怖～いw.mp3" },
         ]
     },
     {
@@ -1174,6 +1213,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ★新規追加: ページの準備ができたら、最初のタッチでAudioContextを起動するリスナーを設定
     attachFirstTouchActivator();
 });
+
 
 
 
